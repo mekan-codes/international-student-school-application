@@ -11,9 +11,9 @@
   <p class="muted">Sign in to your account to continue.</p>
 
   <form method="post">
-    <label>Email</label>
-    <input type="email" name="email" required autofocus
-           autocomplete="email" placeholder="you@school.com">
+    <label>Email or Student ID</label>
+    <input type="text" name="identifier" required autofocus
+           autocomplete="username" placeholder="you@school.com or S001">
 
     <label>Password</label>
     <input type="password" name="password" required
@@ -29,7 +29,8 @@
   <div class="demo-block">
     <strong>Demo accounts</strong>
     <div>Admin — admin@school.com / admin123</div>
-    <div>Student — student1@school.com / student123</div>
+    <div>Manager — manager@school.com / manager123</div>
+    <div>Student — student1@school.com / student123 <span class="text-muted">(or use S001)</span></div>
   </div>
 </div>
 {% endblock %}

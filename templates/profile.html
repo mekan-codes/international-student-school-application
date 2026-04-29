@@ -4,10 +4,10 @@
 {% block content %}
 <div class="row g-3">
   <div class="col-lg-7">
-    <div class="card">
+    <div class="card mb-3">
       <div class="card-header"><strong>Edit your profile</strong></div>
       <div class="card-body">
-        <form method="post">
+        <form method="post" action="{{ url_for('profile.index') }}">
           <div class="mb-3">
             <label class="form-label">Full name</label>
             <input class="form-control" name="name" value="{{ current_user.name }}" required>
@@ -18,31 +18,57 @@
                    autocomplete="email" value="{{ current_user.email }}" required>
           </div>
 
-          <hr class="my-4">
-          <h6 class="text-muted text-uppercase small mb-3">Change password (optional)</h6>
+          <div class="mb-3">
+            <label class="form-label">Phone number <span class="text-muted small">(optional)</span></label>
+            <input class="form-control" type="tel" name="phone_number"
+                   value="{{ current_user.phone_number or '' }}"
+                   placeholder="+1 555 123 4567">
+            <div class="form-check mt-2">
+              <input class="form-check-input" type="checkbox"
+                     id="showPhone" name="show_phone_number"
+                     {% if current_user.show_phone_number %}checked{% endif %}>
+              <label class="form-check-label" for="showPhone">
+                Show my phone number to other lounge members
+              </label>
+            </div>
+            <div class="form-text">
+              When unchecked, your number is stored but never displayed to others.
+            </div>
+          </div>
 
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save profile
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {# ---- Separate, dedicated password change form (safer flow) ---- #}
+    <div class="card">
+      <div class="card-header">
+        <strong><i class="bi bi-shield-lock"></i> Change password</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('profile.change_password') }}">
           <div class="mb-3">
             <label class="form-label">Current password</label>
             <input class="form-control" type="password" name="current_password"
-                   autocomplete="current-password"
-                   placeholder="Required only if changing password">
+                   autocomplete="current-password" required>
           </div>
           <div class="row">
             <div class="col-md-6 mb-3">
               <label class="form-label">New password</label>
               <input class="form-control" type="password" name="new_password"
-                     autocomplete="new-password" minlength="6"
-                     placeholder="At least 6 characters">
+                     autocomplete="new-password" minlength="6" required>
             </div>
             <div class="col-md-6 mb-3">
               <label class="form-label">Confirm new password</label>
               <input class="form-control" type="password" name="confirm_password"
-                     autocomplete="new-password" minlength="6">
+                     autocomplete="new-password" minlength="6" required>
             </div>
           </div>
-
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-lg"></i> Save changes
+          <button type="submit" class="btn btn-warning">
+            <i class="bi bi-key"></i> Change password
           </button>
         </form>
       </div>
@@ -58,6 +84,8 @@
           <dd>
             {% if current_user.is_admin %}
               <span class="badge bg-primary">Admin</span>
+            {% elif current_user.is_manager %}
+              <span class="badge bg-info text-dark">Manager</span>
             {% else %}
               <span class="badge bg-secondary">Student</span>
             {% endif %}
@@ -68,7 +96,7 @@
           <dd>{{ current_user.student_id }}</dd>
           {% endif %}
 
-          {% if not current_user.is_admin %}
+          {% if current_user.role == 'student' %}
           <dt>Substitute food program</dt>
           <dd>
             {% if current_user.is_sub_food_member %}
@@ -83,7 +111,7 @@
           <dd>{{ current_user.created_at.strftime('%b %d, %Y') }}</dd>
         </dl>
         <p class="text-muted small mt-3 mb-0">
-          Role and program membership can only be changed by an admin.
+          Role, program membership, and student ID can only be changed by an admin or manager.
         </p>
       </div>
     </div>

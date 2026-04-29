@@ -11,18 +11,31 @@ db = SQLAlchemy()
 
 
 class User(UserMixin, db.Model):
-    """Represents both admins and students. Role determines access."""
+    """Represents admins, managers, and students. Role + flags drive access."""
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(120), nullable=False)
-    student_id = db.Column(db.String(50), unique=True, nullable=True)  # null for admins
+    student_id = db.Column(db.String(50), unique=True, nullable=True)  # null for staff
     email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(255), nullable=False)
-    role = db.Column(db.String(20), nullable=False, default="student")  # 'admin' or 'student'
+
+    # Role: 'admin' | 'manager' | 'student'
+    role = db.Column(db.String(20), nullable=False, default="student")
+
     is_sub_food_member = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Optional phone number with privacy toggle.
+    phone_number = db.Column(db.String(40), nullable=True)
+    show_phone_number = db.Column(db.Boolean, nullable=False, default=False)
+
+    # Protected (developer/system) accounts cannot be modified, demoted, or
+    # deleted by anyone other than themselves (through their own profile).
+    is_protected = db.Column(db.Boolean, nullable=False, default=False)
+
     created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
 
+    # ----- Helpers -----
     def set_password(self, password: str) -> None:
         self.password_hash = generate_password_hash(password)
 
@@ -32,6 +45,20 @@ class User(UserMixin, db.Model):
     @property
     def is_admin(self) -> bool:
         return self.role == "admin"
+
+    @property
+    def is_manager(self) -> bool:
+        return self.role == "manager"
+
+    @property
+    def is_staff(self) -> bool:
+        """Admins and managers both count as staff."""
+        return self.role in ("admin", "manager")
+
+    @property
+    def role_label(self) -> str:
+        return {"admin": "Admin", "manager": "Manager",
+                "student": "Student"}.get(self.role, self.role.title())
 
 
 class FoodItem(db.Model):
@@ -62,7 +89,6 @@ class InventoryLog(db.Model):
     food_id = db.Column(db.Integer, db.ForeignKey("food_items.id"), nullable=False)
     food_name = db.Column(db.String(120), nullable=False)
     action_type = db.Column(db.String(40), nullable=False)
-    # add_to_warehouse | transfer_to_locker | adjust_warehouse | adjust_locker | distribute_to_student
     quantity = db.Column(db.Integer, nullable=False)
     source_location = db.Column(db.String(40), nullable=True)
     destination_location = db.Column(db.String(40), nullable=True)
@@ -73,13 +99,12 @@ class InventoryLog(db.Model):
 
 
 class Distribution(db.Model):
-    """A single 'pickup' event: one student takes one or more foods at the same time.
-    Used by the Shareable Food Log."""
+    """A single 'pickup' event: one student takes one or more foods at once."""
     __tablename__ = "distributions"
 
     id = db.Column(db.Integer, primary_key=True)
     student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    student_name = db.Column(db.String(120), nullable=False)  # denormalized
+    student_name = db.Column(db.String(120), nullable=False)
     performed_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     performed_by_user_name = db.Column(db.String(120), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
@@ -100,8 +125,7 @@ class DistributionItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     distribution_id = db.Column(db.Integer, db.ForeignKey("distributions.id"), nullable=False)
     food_id = db.Column(db.Integer, db.ForeignKey("food_items.id"), nullable=False)
-    food_name = db.Column(db.String(120), nullable=False)  # denormalized
+    food_name = db.Column(db.String(120), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
-    # Snapshot of stock right after the pickup, for the shareable log
     locker_qty_after = db.Column(db.Integer, nullable=True)
     warehouse_qty_after = db.Column(db.Integer, nullable=True)

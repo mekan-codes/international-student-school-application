@@ -6,71 +6,55 @@
   <div class="card-body welcome-card">
     <h3 class="mb-1">Welcome to the International Lounge, {{ current_user.name }} 👋</h3>
     <p class="text-muted mb-0">
-      Student ID: <strong>{{ current_user.student_id }}</strong>
-      &nbsp;·&nbsp; Member status:
-      {% if current_user.is_sub_food_member %}
-        <span class="badge bg-success">Substitute food program</span>
-      {% else %}
-        <span class="badge bg-secondary">Standard student</span>
+      {% if current_user.student_id %}
+        Student ID: <strong>{{ current_user.student_id }}</strong>
       {% endif %}
     </p>
   </div>
 </div>
 
 <div class="row g-3 mb-4">
+  {% if current_user.is_sub_food_member %}
   <div class="col-md-6">
-    <div class="info-tile">
-      <i class="bi bi-archive"></i>
-      <div>
-        <strong>Available Locker Food</strong>
-        <p>Browse what's currently in the lounge locker, in real time.</p>
+    <a class="info-tile-link" href="{{ url_for('student.food') }}">
+      <div class="info-tile">
+        <i class="bi bi-archive"></i>
+        <div>
+          <strong>Food Availability</strong>
+          <p>See what's currently in the lounge locker, in real time.</p>
+        </div>
       </div>
-    </div>
+    </a>
   </div>
+  {% endif %}
+
   <div class="col-md-6">
-    <div class="info-tile">
-      <i class="bi bi-person-circle"></i>
-      <div>
-        <strong>Your Profile</strong>
-        <p>
-          <a href="{{ url_for('profile.index') }}">Update your name, email, or password.</a>
-        </p>
+    <a class="info-tile-link" href="{{ url_for('profile.index') }}">
+      <div class="info-tile">
+        <i class="bi bi-person-circle"></i>
+        <div>
+          <strong>Your Profile</strong>
+          <p>Update your name, email, phone number, or password.</p>
+        </div>
       </div>
-    </div>
+    </a>
   </div>
 </div>
 
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <h4 class="mb-0">Available Locker Food</h4>
-  <span class="text-muted small">Read-only view</span>
-</div>
-
-{% if locker_items %}
-<div class="row g-3">
-  {% for f in locker_items %}
-  <div class="col-sm-6 col-lg-4">
-    <div class="card food-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <h5 class="card-title mb-1">{{ f.name }}</h5>
-          <span class="badge bg-secondary">{{ f.category }}</span>
-        </div>
-        <p class="text-muted mb-3">In locker</p>
-        <div class="qty-row">
-          <span class="qty">{{ f.locker_quantity }}</span>
-          <span class="qty-label">available</span>
-        </div>
-      </div>
-    </div>
-  </div>
-  {% endfor %}
-</div>
-{% else %}
 <div class="card">
-  <div class="card-body text-center text-muted py-5">
-    <i class="bi bi-archive" style="font-size: 2rem;"></i>
-    <p class="mt-2 mb-0">There is currently no food in the locker.</p>
+  <div class="card-body">
+    <h5 class="card-title"><i class="bi bi-stars"></i> What's coming next</h5>
+    <p class="text-muted mb-3">
+      We're rolling out more lounge features for international students.
+      Keep an eye on the sidebar:
+    </p>
+    <ul class="upcoming-list mb-0">
+      <li><i class="bi bi-bag"></i> Borrowing system</li>
+      <li><i class="bi bi-envelope-paper"></i> Requests to International Department</li>
+      <li><i class="bi bi-megaphone"></i> Announcements</li>
+      <li><i class="bi bi-chat-dots"></i> Common Group Chat</li>
+      <li><i class="bi bi-droplet"></i> Cleaning Sessions</li>
+    </ul>
   </div>
 </div>
-{% endif %}
 {% endblock %}

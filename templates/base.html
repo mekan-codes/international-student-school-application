@@ -21,7 +21,8 @@
       <span>International Lounge</span>
     </div>
 
-    {% if current_user.is_admin %}
+    {% if current_user.is_staff %}
+      {# ---- Admin & Manager nav (same items; sensitive actions are gated server-side) ---- #}
       <nav class="nav-list">
         <a href="{{ url_for('admin.dashboard') }}"
            class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
@@ -29,9 +30,9 @@
         </a>
 
         <div class="nav-section">Manage</div>
-        <a href="{{ url_for('admin.students') }}"
-           class="{% if request.endpoint == 'admin.students' %}active{% endif %}">
-          <i class="bi bi-people"></i> Students
+        <a href="{{ url_for('admin.users') }}"
+           class="{% if request.endpoint == 'admin.users' %}active{% endif %}">
+          <i class="bi bi-people"></i> Users
         </a>
         <a href="{{ url_for('admin.food_items') }}"
            class="{% if request.endpoint == 'admin.food_items' %}active{% endif %}">
@@ -61,30 +62,20 @@
         </a>
 
         <div class="nav-section">Coming soon</div>
-        <a href="{{ url_for('coming_soon', module='borrowing') }}"
-           class="coming-soon-link">
-          <i class="bi bi-bag"></i> Borrowing
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='borrowing') }}" class="coming-soon-link">
+          <i class="bi bi-bag"></i> Borrowing <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='requests') }}"
-           class="coming-soon-link">
-          <i class="bi bi-envelope-paper"></i> International Dept.
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='requests') }}" class="coming-soon-link">
+          <i class="bi bi-envelope-paper"></i> International Dept. <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='announcements') }}"
-           class="coming-soon-link">
-          <i class="bi bi-megaphone"></i> Announcements
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='announcements') }}" class="coming-soon-link">
+          <i class="bi bi-megaphone"></i> Announcements <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='chat') }}"
-           class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
+          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='cleaning') }}"
-           class="coming-soon-link">
-          <i class="bi bi-droplet"></i> Cleaning Sessions
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='cleaning') }}" class="coming-soon-link">
+          <i class="bi bi-droplet"></i> Cleaning Sessions <span class="badge-soon">soon</span>
         </a>
 
         <div class="nav-section">Account</div>
@@ -94,41 +85,40 @@
         </a>
       </nav>
     {% else %}
+      {# ---- Student nav. Food links only for sub-food members. ---- #}
       <nav class="nav-list">
         <a href="{{ url_for('student.dashboard') }}"
            class="{% if request.endpoint == 'student.dashboard' %}active{% endif %}">
           <i class="bi bi-speedometer2"></i> My Dashboard
         </a>
+
+        {% if current_user.is_sub_food_member %}
+          <a href="{{ url_for('student.food') }}"
+             class="{% if request.endpoint == 'student.food' %}active{% endif %}">
+            <i class="bi bi-archive"></i> Food Availability
+          </a>
+        {% endif %}
+
         <a href="{{ url_for('profile.index') }}"
            class="{% if request.endpoint == 'profile.index' %}active{% endif %}">
           <i class="bi bi-person-circle"></i> My Profile
         </a>
 
         <div class="nav-section">Coming soon</div>
-        <a href="{{ url_for('coming_soon', module='borrowing') }}"
-           class="coming-soon-link">
-          <i class="bi bi-bag"></i> Borrowing
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='borrowing') }}" class="coming-soon-link">
+          <i class="bi bi-bag"></i> Borrowing <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='requests') }}"
-           class="coming-soon-link">
-          <i class="bi bi-envelope-paper"></i> International Dept.
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='requests') }}" class="coming-soon-link">
+          <i class="bi bi-envelope-paper"></i> International Dept. <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='announcements') }}"
-           class="coming-soon-link">
-          <i class="bi bi-megaphone"></i> Announcements
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='announcements') }}" class="coming-soon-link">
+          <i class="bi bi-megaphone"></i> Announcements <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='chat') }}"
-           class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
+          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
         </a>
-        <a href="{{ url_for('coming_soon', module='cleaning') }}"
-           class="coming-soon-link">
-          <i class="bi bi-droplet"></i> Cleaning Sessions
-          <span class="badge-soon">soon</span>
+        <a href="{{ url_for('coming_soon', module='cleaning') }}" class="coming-soon-link">
+          <i class="bi bi-droplet"></i> Cleaning Sessions <span class="badge-soon">soon</span>
         </a>
       </nav>
     {% endif %}
@@ -138,7 +128,7 @@
         <div class="avatar">{{ current_user.name[:1]|upper }}</div>
         <div>
           <div class="user-name">{{ current_user.name }}</div>
-          <div class="user-role">{{ current_user.role|capitalize }}</div>
+          <div class="user-role">{{ current_user.role_label }}</div>
         </div>
       </div>
       <a class="logout" href="{{ url_for('auth.logout') }}">

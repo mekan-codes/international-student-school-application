@@ -1,7 +1,18 @@
 """
-Admin routes: dashboard, student management, food items, inventory, transfers,
-distributions, shareable log, and inventory history.
-All routes are protected by @admin_required.
+Admin / Manager routes:
+- Dashboard, user management, food items, inventory, transfers, distributions,
+  shareable log, inventory history.
+
+Permissions:
+- @staff_required → admin OR manager (most operational tasks)
+- @admin_required → admin only (role changes, password resets, deleting/editing
+  staff accounts)
+
+Protections:
+- "is_protected" users can NOT be modified, demoted, or deleted by anyone except
+  themselves (through their own profile page).
+- The system always keeps at least one admin: demoting/deleting the last admin
+  is refused.
 """
 from functools import wraps
 from datetime import datetime, date, timedelta
@@ -20,8 +31,11 @@ from models import db, User, FoodItem, InventoryLog, Distribution, DistributionI
 admin_bp = Blueprint("admin", __name__)
 
 
+# --------------------------------------------------------------------------- #
+# Decorators                                                                  #
+# --------------------------------------------------------------------------- #
 def admin_required(view):
-    """Decorator: only allow users with role='admin'."""
+    """Admin only."""
     @wraps(view)
     @login_required
     def wrapped(*args, **kwargs):
@@ -31,37 +45,80 @@ def admin_required(view):
     return wrapped
 
 
+def staff_required(view):
+    """Admin or manager."""
+    @wraps(view)
+    @login_required
+    def wrapped(*args, **kwargs):
+        if not current_user.is_staff:
+            abort(403)
+        return view(*args, **kwargs)
+    return wrapped
+
+
+# --------------------------------------------------------------------------- #
+# Helpers                                                                     #
+# --------------------------------------------------------------------------- #
 def _log_action(food: FoodItem, action_type: str, quantity: int,
                 source: str | None, destination: str | None, note: str = "") -> None:
-    """Helper: create an InventoryLog row for an action."""
     log = InventoryLog(
-        food_id=food.id,
-        food_name=food.name,
-        action_type=action_type,
-        quantity=quantity,
-        source_location=source,
-        destination_location=destination,
+        food_id=food.id, food_name=food.name,
+        action_type=action_type, quantity=quantity,
+        source_location=source, destination_location=destination,
         performed_by_user_id=current_user.id,
         performed_by_user_name=current_user.name,
-        note=note or None,
-        timestamp=datetime.utcnow(),
+        note=note or None, timestamp=datetime.utcnow(),
     )
     db.session.add(log)
+
+
+def _admin_count() -> int:
+    return User.query.filter_by(role="admin").count()
+
+
+def _can_manager_modify(target: User) -> bool:
+    """Managers may operate only on student-role users."""
+    return target.role == "student"
+
+
+def _ensure_can_modify(target: User, *, allow_self: bool = False) -> None:
+    """Raise via flash+abort/return helpers if current_user can't modify target.
+    NOTE: callers should check the returned tuple. This helper just raises a
+    flash + 403 when blocked. Use _check_can_modify for boolean form."""
+    pass  # kept for documentation; logic lives in _check_can_modify below
+
+
+def _check_can_modify(target: User, *, allow_self: bool = False) -> tuple[bool, str]:
+    """Return (allowed, error_message). Centralizes role-based gating."""
+    if target.is_protected and target.id != current_user.id:
+        return False, "That account is protected and cannot be modified."
+    if current_user.is_admin:
+        return True, ""
+    if current_user.is_manager:
+        if allow_self and target.id == current_user.id:
+            return True, ""
+        if not _can_manager_modify(target):
+            return False, "Managers cannot modify admin or manager accounts."
+        return True, ""
+    return False, "Permission denied."
 
 
 # --------------------------------------------------------------------------- #
 # Dashboard                                                                   #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/")
-@admin_required
+@staff_required
 def dashboard():
     total_students = User.query.filter_by(role="student").count()
-    sub_food_members = User.query.filter_by(role="student", is_sub_food_member=True).count()
+    sub_food_members = User.query.filter_by(role="student",
+                                            is_sub_food_member=True).count()
     total_food_types = FoodItem.query.filter_by(is_active=True).count()
-    total_warehouse = db.session.query(func.coalesce(func.sum(FoodItem.warehouse_quantity), 0)).scalar()
-    total_locker = db.session.query(func.coalesce(func.sum(FoodItem.locker_quantity), 0)).scalar()
-
-    low_stock_items = [f for f in FoodItem.query.filter_by(is_active=True).all() if f.is_low_stock]
+    total_warehouse = db.session.query(
+        func.coalesce(func.sum(FoodItem.warehouse_quantity), 0)).scalar()
+    total_locker = db.session.query(
+        func.coalesce(func.sum(FoodItem.locker_quantity), 0)).scalar()
+    low_stock_items = [f for f in FoodItem.query.filter_by(is_active=True).all()
+                       if f.is_low_stock]
 
     return render_template(
         "admin/dashboard.html",
@@ -75,79 +132,117 @@ def dashboard():
 
 
 # --------------------------------------------------------------------------- #
-# Student management                                                          #
+# User management (was: students)                                             #
 # --------------------------------------------------------------------------- #
-@admin_bp.route("/students")
-@admin_required
-def students():
-    student_list = User.query.filter_by(role="student").order_by(User.created_at.desc()).all()
-    return render_template("admin/students.html", students=student_list)
+@admin_bp.route("/users")
+@staff_required
+def users():
+    role_filter = request.args.get("role", "all")
+    q = User.query
+    if role_filter in ("admin", "manager", "student"):
+        q = q.filter_by(role=role_filter)
+    user_list = q.order_by(User.role, User.created_at.desc()).all()
+    return render_template(
+        "admin/users.html",
+        users=user_list, role_filter=role_filter,
+    )
 
 
-@admin_bp.route("/students/add", methods=["POST"])
-@admin_required
-def add_student():
+@admin_bp.route("/users/add", methods=["POST"])
+@staff_required
+def add_user():
+    """Add a new user. Managers may only add students; admins may add students
+    or managers (but not other admins via this form — keep admin creation a
+    deliberate database-level action)."""
     name = (request.form.get("name") or "").strip()
     student_id = (request.form.get("student_id") or "").strip()
     email = (request.form.get("email") or "").strip().lower()
     password = request.form.get("password") or ""
+    role = (request.form.get("role") or "student").strip()
     is_member = bool(request.form.get("is_sub_food_member"))
 
-    if not all([name, student_id, email, password]):
-        flash("All fields are required.", "danger")
-        return redirect(url_for("admin.students"))
+    if role not in ("student", "manager"):
+        flash("Invalid role.", "danger")
+        return redirect(url_for("admin.users"))
+    if role == "manager" and not current_user.is_admin:
+        flash("Only admins can create managers.", "danger")
+        return redirect(url_for("admin.users"))
+
+    if not all([name, email, password]):
+        flash("Name, email, and password are required.", "danger")
+        return redirect(url_for("admin.users"))
+    if role == "student" and not student_id:
+        flash("Student ID is required for students.", "danger")
+        return redirect(url_for("admin.users"))
+    if len(password) < 6:
+        flash("Password must be at least 6 characters.", "danger")
+        return redirect(url_for("admin.users"))
     if User.query.filter_by(email=email).first():
         flash("Email already exists.", "danger")
-        return redirect(url_for("admin.students"))
-    if User.query.filter_by(student_id=student_id).first():
+        return redirect(url_for("admin.users"))
+    if student_id and User.query.filter_by(student_id=student_id).first():
         flash("Student ID already exists.", "danger")
-        return redirect(url_for("admin.students"))
+        return redirect(url_for("admin.users"))
 
     user = User(
-        name=name, student_id=student_id, email=email,
-        role="student", is_sub_food_member=is_member,
+        name=name,
+        student_id=student_id or None,
+        email=email,
+        role=role,
+        is_sub_food_member=(is_member if role == "student" else False),
     )
     user.set_password(password)
     db.session.add(user)
     db.session.commit()
-    flash(f"Added student {name}.", "success")
-    return redirect(url_for("admin.students"))
+    flash(f"Added {role} {name}.", "success")
+    return redirect(url_for("admin.users"))
 
 
-@admin_bp.route("/students/<int:user_id>/edit", methods=["POST"])
-@admin_required
-def edit_student(user_id):
-    user = User.query.get_or_404(user_id)
-    if user.role != "student":
-        abort(400)
+@admin_bp.route("/users/<int:user_id>/edit", methods=["POST"])
+@staff_required
+def edit_user(user_id):
+    user = db.session.get(User, user_id) or abort(404)
+    ok, err = _check_can_modify(user)
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.users"))
 
     user.name = (request.form.get("name") or user.name).strip()
-    user.student_id = (request.form.get("student_id") or user.student_id).strip()
-    new_email = (request.form.get("email") or user.email).strip().lower()
-    if new_email != user.email and User.query.filter_by(email=new_email).first():
-        flash("Email already in use by another account.", "danger")
-        return redirect(url_for("admin.students"))
-    user.email = new_email
-    user.is_sub_food_member = bool(request.form.get("is_sub_food_member"))
 
-    new_password = request.form.get("password") or ""
-    if new_password:
-        if len(new_password) < 6:
-            flash("Password must be at least 6 characters.", "danger")
-            return redirect(url_for("admin.students"))
-        user.set_password(new_password)
+    # Email
+    new_email = (request.form.get("email") or user.email).strip().lower()
+    if new_email != user.email:
+        existing = User.query.filter_by(email=new_email).first()
+        if existing and existing.id != user.id:
+            flash("Email already in use by another account.", "danger")
+            return redirect(url_for("admin.users"))
+        user.email = new_email
+
+    # Student ID (only meaningful for students)
+    if user.role == "student":
+        new_sid = (request.form.get("student_id") or user.student_id or "").strip()
+        if new_sid and new_sid != (user.student_id or ""):
+            existing = User.query.filter_by(student_id=new_sid).first()
+            if existing and existing.id != user.id:
+                flash("Student ID already in use.", "danger")
+                return redirect(url_for("admin.users"))
+            user.student_id = new_sid
+        user.is_sub_food_member = bool(request.form.get("is_sub_food_member"))
 
     db.session.commit()
     flash(f"Updated {user.name}.", "success")
-    return redirect(url_for("admin.students"))
+    return redirect(url_for("admin.users"))
 
 
-@admin_bp.route("/students/<int:user_id>/toggle-member", methods=["POST"])
-@admin_required
+@admin_bp.route("/users/<int:user_id>/toggle-member", methods=["POST"])
+@staff_required
 def toggle_member(user_id):
-    user = User.query.get_or_404(user_id)
+    user = db.session.get(User, user_id) or abort(404)
     if user.role != "student":
-        abort(400)
+        flash("Only students can be sub-food members.", "danger")
+        return redirect(url_for("admin.users"))
+    ok, err = _check_can_modify(user)
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.users"))
     user.is_sub_food_member = not user.is_sub_food_member
     db.session.commit()
     flash(
@@ -155,33 +250,108 @@ def toggle_member(user_id):
         " of the substitute food program.",
         "success",
     )
-    return redirect(url_for("admin.students"))
+    return redirect(url_for("admin.users"))
 
 
-@admin_bp.route("/students/<int:user_id>/delete", methods=["POST"])
+@admin_bp.route("/users/<int:user_id>/promote", methods=["POST"])
 @admin_required
-def delete_student(user_id):
-    user = User.query.get_or_404(user_id)
+def promote_user(user_id):
+    """student → manager. Admin only."""
+    user = db.session.get(User, user_id) or abort(404)
+    if user.is_protected:
+        flash("That account is protected.", "danger")
+        return redirect(url_for("admin.users"))
     if user.role != "student":
-        abort(400)
+        flash("Only students can be promoted to manager.", "danger")
+        return redirect(url_for("admin.users"))
+    user.role = "manager"
+    user.is_sub_food_member = False  # managers aren't part of the food program
+    db.session.commit()
+    flash(f"{user.name} is now a manager.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/demote", methods=["POST"])
+@admin_required
+def demote_user(user_id):
+    """manager → student. Admin only. Cannot demote admins through this route."""
+    user = db.session.get(User, user_id) or abort(404)
+    if user.is_protected:
+        flash("That account is protected.", "danger")
+        return redirect(url_for("admin.users"))
+    if user.role != "manager":
+        flash("Only managers can be demoted to student.", "danger")
+        return redirect(url_for("admin.users"))
+    if not user.student_id:
+        # student_id is required for students; ask admin to set one via edit.
+        flash("Set a student ID for this account before demoting.", "warning")
+        return redirect(url_for("admin.users"))
+    user.role = "student"
+    db.session.commit()
+    flash(f"{user.name} is now a student.", "success")
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/reset-password", methods=["POST"])
+@admin_required
+def reset_password(user_id):
+    """Admin sets a temporary new password for any non-protected user.
+    Old/current password is never displayed or required."""
+    user = db.session.get(User, user_id) or abort(404)
+    if user.is_protected and user.id != current_user.id:
+        flash("That account is protected.", "danger")
+        return redirect(url_for("admin.users"))
+    new_password = request.form.get("new_password") or ""
+    if len(new_password) < 6:
+        flash("Temporary password must be at least 6 characters.", "danger")
+        return redirect(url_for("admin.users"))
+    user.set_password(new_password)
+    db.session.commit()
+    flash(
+        f"Password reset for {user.name}. Share the temporary password securely; "
+        "they should change it on next login.",
+        "success",
+    )
+    return redirect(url_for("admin.users"))
+
+
+@admin_bp.route("/users/<int:user_id>/delete", methods=["POST"])
+@staff_required
+def delete_user(user_id):
+    user = db.session.get(User, user_id) or abort(404)
+    if user.id == current_user.id:
+        flash("You cannot delete your own account.", "danger")
+        return redirect(url_for("admin.users"))
+    ok, err = _check_can_modify(user)
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.users"))
+    if user.role == "admin":
+        # Even an admin can't delete an admin via UI without a second admin.
+        if _admin_count() <= 1:
+            flash("Cannot delete the last remaining admin.", "danger")
+            return redirect(url_for("admin.users"))
+    if user.role in ("admin", "manager") and not current_user.is_admin:
+        flash("Only admins can delete staff accounts.", "danger")
+        return redirect(url_for("admin.users"))
+
     db.session.delete(user)
     db.session.commit()
-    flash("Student deleted.", "info")
-    return redirect(url_for("admin.students"))
+    flash(f"Deleted {user.name}.", "info")
+    return redirect(url_for("admin.users"))
 
 
 # --------------------------------------------------------------------------- #
 # Food items                                                                  #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/food-items")
-@admin_required
+@staff_required
 def food_items():
     items = FoodItem.query.order_by(FoodItem.name).all()
     return render_template("admin/food_items.html", items=items)
 
 
 @admin_bp.route("/food-items/add", methods=["POST"])
-@admin_required
+@staff_required
 def add_food_item():
     name = (request.form.get("name") or "").strip()
     category = (request.form.get("category") or "general").strip()
@@ -206,15 +376,14 @@ def add_food_item():
 
 
 @admin_bp.route("/food-items/<int:item_id>/edit", methods=["POST"])
-@admin_required
+@staff_required
 def edit_food_item(item_id):
-    item = FoodItem.query.get_or_404(item_id)
+    item = db.session.get(FoodItem, item_id) or abort(404)
 
     new_name = (request.form.get("name") or "").strip()
     if not new_name:
         flash("Food name cannot be empty.", "danger")
         return redirect(url_for("admin.food_items"))
-    # Avoid unique-constraint violation
     if new_name != item.name:
         existing = FoodItem.query.filter_by(name=new_name).first()
         if existing and existing.id != item.id:
@@ -222,13 +391,11 @@ def edit_food_item(item_id):
             return redirect(url_for("admin.food_items"))
     item.name = new_name
     item.category = (request.form.get("category") or item.category).strip() or "general"
-
     try:
         item.low_stock_threshold = max(0, int(request.form.get("low_stock_threshold") or 0))
     except ValueError:
         flash("Threshold must be a non-negative integer.", "danger")
         return redirect(url_for("admin.food_items"))
-
     item.is_active = bool(request.form.get("is_active"))
     db.session.commit()
     flash(f"Updated food item: {item.name}.", "success")
@@ -236,9 +403,9 @@ def edit_food_item(item_id):
 
 
 @admin_bp.route("/food-items/<int:item_id>/delete", methods=["POST"])
-@admin_required
+@staff_required
 def delete_food_item(item_id):
-    item = FoodItem.query.get_or_404(item_id)
+    item = db.session.get(FoodItem, item_id) or abort(404)
     db.session.delete(item)
     db.session.commit()
     flash("Food item deleted.", "info")
@@ -249,16 +416,16 @@ def delete_food_item(item_id):
 # Warehouse inventory                                                         #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/warehouse")
-@admin_required
+@staff_required
 def warehouse():
     items = FoodItem.query.filter_by(is_active=True).order_by(FoodItem.name).all()
     return render_template("admin/warehouse.html", items=items)
 
 
 @admin_bp.route("/warehouse/add-stock", methods=["POST"])
-@admin_required
+@staff_required
 def add_warehouse_stock():
-    item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
+    item = db.session.get(FoodItem, int(request.form.get("food_id") or 0)) or abort(404)
     try:
         qty = int(request.form.get("quantity") or 0)
     except ValueError:
@@ -278,10 +445,9 @@ def add_warehouse_stock():
 
 
 @admin_bp.route("/warehouse/adjust", methods=["POST"])
-@admin_required
+@staff_required
 def adjust_warehouse():
-    """Manually set warehouse quantity (e.g. for corrections)."""
-    item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
+    item = db.session.get(FoodItem, int(request.form.get("food_id") or 0)) or abort(404)
     try:
         new_qty = int(request.form.get("new_quantity"))
     except (ValueError, TypeError):
@@ -309,16 +475,16 @@ def adjust_warehouse():
 # Locker inventory                                                            #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/locker")
-@admin_required
+@staff_required
 def locker():
     items = FoodItem.query.filter_by(is_active=True).order_by(FoodItem.name).all()
     return render_template("admin/locker.html", items=items)
 
 
 @admin_bp.route("/locker/adjust", methods=["POST"])
-@admin_required
+@staff_required
 def adjust_locker():
-    item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
+    item = db.session.get(FoodItem, int(request.form.get("food_id") or 0)) or abort(404)
     try:
         new_qty = int(request.form.get("new_quantity"))
     except (ValueError, TypeError):
@@ -346,10 +512,10 @@ def adjust_locker():
 # Transfer warehouse -> locker                                                #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/transfer", methods=["GET", "POST"])
-@admin_required
+@staff_required
 def transfer():
     if request.method == "POST":
-        item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
+        item = db.session.get(FoodItem, int(request.form.get("food_id") or 0)) or abort(404)
         try:
             qty = int(request.form.get("quantity") or 0)
         except ValueError:
@@ -359,10 +525,8 @@ def transfer():
             flash("Quantity must be greater than zero.", "danger")
             return redirect(url_for("admin.transfer"))
         if qty > item.warehouse_quantity:
-            flash(
-                f"Cannot transfer {qty} — only {item.warehouse_quantity} available in warehouse.",
-                "danger",
-            )
+            flash(f"Cannot transfer {qty} — only {item.warehouse_quantity}"
+                  " available in warehouse.", "danger")
             return redirect(url_for("admin.transfer"))
 
         item.warehouse_quantity -= qty
@@ -391,13 +555,9 @@ def _parse_date(value: str | None) -> date | None:
 
 
 @admin_bp.route("/distributions", methods=["GET", "POST"])
-@admin_required
+@staff_required
 def distributions():
-    """Record a food pickup for a student (locker quantities decrease) and
-    show the Shareable Food Log."""
-
     if request.method == "POST":
-        # ---- Build the pickup ----
         try:
             student_id = int(request.form.get("student_id") or 0)
         except ValueError:
@@ -409,19 +569,16 @@ def distributions():
             flash("Student not found.", "danger")
             return redirect(url_for("admin.distributions"))
 
-        # Form sends parallel lists food_id[] and quantity[]
         food_ids = request.form.getlist("food_id[]")
         quantities = request.form.getlist("quantity[]")
         note = (request.form.get("note") or "").strip()
 
-        # Normalize and aggregate (in case the same food appears twice)
         line_map: dict[int, int] = {}
         for fid, qty in zip(food_ids, quantities):
             if not fid or not qty:
                 continue
             try:
-                fid_i = int(fid)
-                qty_i = int(qty)
+                fid_i = int(fid); qty_i = int(qty)
             except ValueError:
                 flash("Invalid quantity entered.", "danger")
                 return redirect(url_for("admin.distributions"))
@@ -433,55 +590,42 @@ def distributions():
             flash("Please add at least one food and quantity.", "danger")
             return redirect(url_for("admin.distributions"))
 
-        # Validate that locker stock is sufficient for every item BEFORE writing
-        items = {f.id: f for f in FoodItem.query.filter(FoodItem.id.in_(line_map.keys())).all()}
+        items = {f.id: f for f in FoodItem.query.filter(
+            FoodItem.id.in_(line_map.keys())).all()}
         for fid, qty in line_map.items():
             f = items.get(fid)
             if not f:
                 flash("One of the selected foods no longer exists.", "danger")
                 return redirect(url_for("admin.distributions"))
             if qty > f.locker_quantity:
-                flash(
-                    f"Cannot give {qty} of {f.name} — only {f.locker_quantity} in the locker.",
-                    "danger",
-                )
+                flash(f"Cannot give {qty} of {f.name} — only "
+                      f"{f.locker_quantity} in the locker.", "danger")
                 return redirect(url_for("admin.distributions"))
 
-        # Create the distribution event
         dist = Distribution(
-            student_id=student.id,
-            student_name=student.name,
+            student_id=student.id, student_name=student.name,
             performed_by_user_id=current_user.id,
             performed_by_user_name=current_user.name,
-            note=note or None,
-            timestamp=datetime.utcnow(),
+            note=note or None, timestamp=datetime.utcnow(),
         )
-        db.session.add(dist)
-        db.session.flush()  # get dist.id
+        db.session.add(dist); db.session.flush()
 
         for fid, qty in line_map.items():
             f = items[fid]
-            f.locker_quantity -= qty  # decrement stock
+            f.locker_quantity -= qty
             db.session.add(DistributionItem(
-                distribution_id=dist.id,
-                food_id=f.id,
-                food_name=f.name,
+                distribution_id=dist.id, food_id=f.id, food_name=f.name,
                 quantity=qty,
                 locker_qty_after=f.locker_quantity,
                 warehouse_qty_after=f.warehouse_quantity,
             ))
-            # Also write a row to inventory_logs so every stock change is audited
-            _log_action(
-                f, "distribute_to_student", qty,
-                source="locker", destination=f"student:{student.name}",
-                note=f"Distribution #{dist.id}",
-            )
-
+            _log_action(f, "distribute_to_student", qty,
+                        source="locker", destination=f"student:{student.name}",
+                        note=f"Distribution #{dist.id}")
         db.session.commit()
         flash(f"Recorded pickup for {student.name}.", "success")
         return redirect(url_for("admin.distributions"))
 
-    # ---- GET: list distributions, with optional date filter ----
     students_list = (User.query.filter_by(role="student")
                      .order_by(User.name).all())
     foods_list = (FoodItem.query.filter_by(is_active=True)
@@ -489,45 +633,34 @@ def distributions():
 
     start_d = _parse_date(request.args.get("start"))
     end_d = _parse_date(request.args.get("end"))
-
     q = Distribution.query
     if start_d:
         q = q.filter(Distribution.timestamp >= datetime.combine(start_d, datetime.min.time()))
     if end_d:
-        # inclusive end-of-day
         q = q.filter(Distribution.timestamp < datetime.combine(end_d + timedelta(days=1),
                                                                datetime.min.time()))
-
     dists = q.order_by(Distribution.timestamp.desc()).limit(500).all()
 
-    # Build the plain-text shareable representation
     text_lines = []
     for d in dists:
         items_str = ", ".join(f"{i.food_name}: {i.quantity}" for i in d.items)
         text_lines.append(
-            f"{d.timestamp.strftime('%b %d, %Y')} | {d.student_name} | {items_str}"
-        )
+            f"{d.timestamp.strftime('%b %d, %Y')} | {d.student_name} | {items_str}")
     shareable_text = "\n".join(text_lines) if text_lines else "(no pickups in this range)"
 
     return render_template(
         "admin/distributions.html",
-        students=students_list,
-        foods=foods_list,
-        distributions=dists,
-        start=request.args.get("start", ""),
-        end=request.args.get("end", ""),
+        students=students_list, foods=foods_list, distributions=dists,
+        start=request.args.get("start", ""), end=request.args.get("end", ""),
         shareable_text=shareable_text,
     )
 
 
 @admin_bp.route("/distributions/export.csv")
-@admin_required
+@staff_required
 def export_distributions_csv():
-    """Download the distribution log as CSV (one row per student-pickup,
-    foods grouped into a single column)."""
     start_d = _parse_date(request.args.get("start"))
     end_d = _parse_date(request.args.get("end"))
-
     q = Distribution.query
     if start_d:
         q = q.filter(Distribution.timestamp >= datetime.combine(start_d, datetime.min.time()))
@@ -546,22 +679,17 @@ def export_distributions_csv():
         foods_taken = "; ".join(f"{i.food_name}: {i.quantity}" for i in d.items)
         locker_remaining = "; ".join(
             f"{i.food_name}: {i.locker_qty_after if i.locker_qty_after is not None else '-'}"
-            for i in d.items
-        )
+            for i in d.items)
         warehouse_remaining = "; ".join(
             f"{i.food_name}: {i.warehouse_qty_after if i.warehouse_qty_after is not None else '-'}"
-            for i in d.items
-        )
+            for i in d.items)
         writer.writerow([
             d.timestamp.strftime("%Y-%m-%d"),
             d.timestamp.strftime("%H:%M"),
-            d.student_name,
-            foods_taken,
-            locker_remaining,
-            warehouse_remaining,
+            d.student_name, foods_taken,
+            locker_remaining, warehouse_remaining,
             d.note or "",
         ])
-
     return Response(
         buf.getvalue(),
         mimetype="text/csv",
@@ -570,33 +698,29 @@ def export_distributions_csv():
 
 
 @admin_bp.route("/distributions/<int:dist_id>/delete", methods=["POST"])
-@admin_required
+@staff_required
 def delete_distribution(dist_id):
-    """Delete a recorded pickup and restore the locker stock."""
-    dist = Distribution.query.get_or_404(dist_id)
+    dist = db.session.get(Distribution, dist_id) or abort(404)
     foods = {f.id: f for f in FoodItem.query.filter(
         FoodItem.id.in_([i.food_id for i in dist.items])).all()}
-
     for item in dist.items:
         f = foods.get(item.food_id)
         if f is not None:
             f.locker_quantity += item.quantity
-            _log_action(
-                f, "adjust_locker", item.quantity,
-                source="locker", destination="locker",
-                note=f"Reversed distribution #{dist.id}",
-            )
+            _log_action(f, "adjust_locker", item.quantity,
+                        source="locker", destination="locker",
+                        note=f"Reversed distribution #{dist.id}")
     db.session.delete(dist)
     db.session.commit()
-    flash("Pickup deleted and stock restored.", "info")
+    flash("Pickup deleted and locker stock restored.", "info")
     return redirect(url_for("admin.distributions"))
 
 
 # --------------------------------------------------------------------------- #
-# Logs / history                                                              #
+# Inventory history                                                           #
 # --------------------------------------------------------------------------- #
 @admin_bp.route("/logs")
-@admin_required
+@staff_required
 def logs():
-    log_list = InventoryLog.query.order_by(InventoryLog.timestamp.desc()).limit(500).all()
-    return render_template("admin/logs.html", logs=log_list)
+    entries = InventoryLog.query.order_by(InventoryLog.timestamp.desc()).limit(500).all()
+    return render_template("admin/logs.html", logs=entries)

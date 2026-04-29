@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Food Availability{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-body">
+    <h4 class="mb-1"><i class="bi bi-archive"></i> Available Locker Food</h4>
+    <p class="text-muted mb-0">
+      Read-only view of what's currently in the lounge locker.
+      Pickups are recorded by lounge staff.
+    </p>
+  </div>
+</div>
+
+{% if locker_items %}
+<div class="row g-3">
+  {% for f in locker_items %}
+  <div class="col-sm-6 col-lg-4">
+    <div class="card food-card h-100">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start">
+          <h5 class="card-title mb-1">{{ f.name }}</h5>
+          <span class="badge bg-secondary">{{ f.category }}</span>
+        </div>
+        <p class="text-muted mb-3">In locker</p>
+        <div class="qty-row">
+          <span class="qty">{{ f.locker_quantity }}</span>
+          <span class="qty-label">available</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center text-muted py-5">
+    <i class="bi bi-archive" style="font-size: 2rem;"></i>
+    <p class="mt-2 mb-0">There is currently no food in the locker.</p>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

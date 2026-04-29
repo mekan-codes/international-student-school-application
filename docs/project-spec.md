@@ -3,11 +3,11 @@
 ## 1. Problem statement
 
 International students at the school rely on shared, manually-tracked
-systems: a substitute-food program with a small warehouse and a daily-access
-locker, a cleaning rotation, borrowed equipment, and an informal suggestion
-channel. These are currently managed across spreadsheets, chat groups, and
-hallway notes — leading to lost stock, missed cleaning shifts, and unclear
-membership status.
+systems: a substitute-food program with a small warehouse and a
+daily-access locker, a cleaning rotation, borrowed equipment, and an
+informal suggestion channel. These are currently managed across
+spreadsheets, chat groups, and hallway notes — leading to lost stock,
+missed cleaning shifts, and unclear membership status.
 
 The International Lounge centralizes these systems into a single
 role-based dashboard.
@@ -16,168 +16,147 @@ role-based dashboard.
 
 V1 implements only the **substitute food management module**.
 
-| Feature                                | Admin | Student |
-|----------------------------------------|:-----:|:-------:|
-| Login / logout                         |   ✅   |    ✅    |
-| Public student registration            |   —   |    ✅    |
-| Personal profile editing               |   ✅   |    ✅    |
-| Admin dashboard with summary cards     |   ✅   |    —    |
-| Student management (CRUD)              |   ✅   |    —    |
-| Toggle substitute-food membership      |   ✅   |    —    |
-| Food item catalog (CRUD + active flag) |   ✅   |    —    |
-| Add stock to warehouse                 |   ✅   |    —    |
-| Adjust warehouse / locker quantities   |   ✅   |    —    |
-| Transfer stock warehouse → locker      |   ✅   |    —    |
-| Record student food pickups            |   ✅   |    —    |
-| Shareable Food Log (text + CSV)        |   ✅   |    —    |
-| Low-stock alerts on dashboard          |   ✅   |    —    |
-| Inventory log / history                |   ✅   |    —    |
-| Student dashboard                      |   —   |    ✅    |
-| View available locker food (read)      |   —   |    ✅    |
+| Feature                                     | Admin | Manager | Sub-food Student | Std. Student |
+|---------------------------------------------|:-----:|:-------:|:----------------:|:------------:|
+| Login by email or student ID                |   ✅   |    ✅   |        ✅         |       ✅      |
+| Public student registration                 |   —   |    —   |        ✅         |       ✅      |
+| Profile: name, email, phone, privacy        |   ✅   |    ✅   |        ✅         |       ✅      |
+| Self-service password change                |   ✅   |    ✅   |        ✅         |       ✅      |
+| Admin dashboard                             |   ✅   |    ✅   |        —         |       —      |
+| User management (edit students)             |   ✅   |    ✅   |        —         |       —      |
+| User management (edit/delete staff)         |   ✅   |    —   |        —         |       —      |
+| Promote student → manager                   |   ✅   |    —   |        —         |       —      |
+| Demote manager → student                    |   ✅   |    —   |        —         |       —      |
+| Reset another user's password               |   ✅   |    —   |        —         |       —      |
+| Food item catalog                           |   ✅   |    ✅   |        —         |       —      |
+| Warehouse / locker / transfer               |   ✅   |    ✅   |        —         |       —      |
+| Shareable Food Log + CSV export             |   ✅   |    ✅   |        —         |       —      |
+| Inventory history                           |   ✅   |    ✅   |        —         |       —      |
+| Student dashboard (general)                 |   —   |    —   |        ✅         |       ✅      |
+| Food availability page                      |   —   |    —   |        ✅         |       —      |
 
-## 3. User roles
+## 3. Roles & access control
 
-- **Admin** — created by another admin. Full access. Demo: `admin@school.com / admin123`.
-- **Student** — created by self-registration or by an admin. Read-only access
-  to inventory; can edit only their own name, email, and password.
+### Decorators (server-side)
 
-Role enforcement is implemented in two layers:
-- Each admin route is decorated with `@admin_required`.
-- The student dashboard route blocks admins (so the views remain semantically distinct).
-- The profile route is `@login_required` and only mutates `name`, `email`,
-  and `password_hash` — `role`, `is_sub_food_member`, and `student_id`
-  cannot be changed by the user themselves.
+| Decorator        | Allows                  | Used for                                       |
+|------------------|--------------------------|------------------------------------------------|
+| `staff_required` | admin OR manager         | Most operational pages                         |
+| `admin_required` | admin only               | Promote, demote, reset password                |
+| `member_required`| sub-food student         | `/student/food`                                |
+| `student_required`| any non-staff user      | Reserved for future student-only pages         |
 
-## 4. Database / data model
+### Account protection
+
+- Users have an `is_protected` flag. Protected accounts can only be
+  modified by themselves through their profile. Even admins cannot delete
+  or demote a protected user.
+- The seed creates the demo admin (`admin@school.com`) as protected so
+  that the system is never left without an admin during demos.
+
+### Last-admin guard
+
+In addition to `is_protected`, demote/delete actions refuse to run if they
+would leave the system with zero admins.
+
+### Manager-specific limits
+
+Managers can do almost everything an admin can do, but **cannot** affect
+admin or manager rows in any way:
+
+- can't edit, delete, promote, demote any staff;
+- can't reset any user's password (admin-only);
+- can't create manager accounts (admin-only).
+
+## 4. Authentication
+
+### Login
+
+The login form has a single **Email or Student ID** field plus a password.
+
+Resolution rule:
+- if the input contains `@`, look up by `email` (lowercased);
+- otherwise look up by `student_id`.
+
+Failed lookups return a generic "Invalid email/student ID or password"
+message — no user enumeration.
+
+### Self-service password change (profile page)
+
+Three required fields:
+- `current_password`
+- `new_password` (≥ 6 chars; must differ from current)
+- `confirm_password` (must match `new_password`)
+
+### Admin password reset
+
+Admin opens the *Users* page → clicks the key icon → sets a temporary
+password. Old password is never displayed or required. The user is
+expected to change it from their own profile after first login.
+
+## 5. Database / data model
 
 ### `users`
+
 | Column                | Type        | Notes                                   |
 |-----------------------|-------------|-----------------------------------------|
 | id                    | INTEGER PK  |                                         |
 | name                  | STRING      |                                         |
-| student_id            | STRING      | unique; null for admins                 |
+| student_id            | STRING      | unique; nullable for staff              |
 | email                 | STRING      | unique                                  |
 | password_hash         | STRING      | werkzeug PBKDF2                         |
-| role                  | STRING      | `admin` or `student`                    |
+| role                  | STRING      | `admin`, `manager`, or `student`        |
 | is_sub_food_member    | BOOLEAN     | only meaningful for students            |
+| **phone_number**      | STRING      | optional                                |
+| **show_phone_number** | BOOLEAN     | privacy toggle                          |
+| **is_protected**      | BOOLEAN     | system/developer accounts               |
 | created_at            | DATETIME    |                                         |
 
-### `food_items`
-| Column                | Type        | Notes                                   |
-|-----------------------|-------------|-----------------------------------------|
-| id                    | INTEGER PK  |                                         |
-| name                  | STRING      | unique                                  |
-| category              | STRING      |                                         |
-| low_stock_threshold   | INTEGER     | locker_quantity ≤ threshold ⇒ low      |
-| is_active             | BOOLEAN     |                                         |
-| created_at            | DATETIME    |                                         |
-| warehouse_quantity    | INTEGER     | non-negative                            |
-| locker_quantity       | INTEGER     | non-negative                            |
+The bold rows are **new in this iteration**; existing SQLite DBs are
+migrated additively at startup (see `app._migrate_schema`).
 
-### `inventory_logs`
-Every quantity change writes a row here, regardless of cause.
+### `food_items`, `inventory_logs`, `distributions`, `distribution_items`
 
-| Column                  | Type        | Notes                                                                                       |
-|-------------------------|-------------|---------------------------------------------------------------------------------------------|
-| log_id                  | INTEGER PK  |                                                                                             |
-| food_id                 | INTEGER FK  | → `food_items.id`                                                                           |
-| food_name               | STRING      | denormalized                                                                                |
-| action_type             | STRING      | `add_to_warehouse`, `transfer_to_locker`, `adjust_warehouse`, `adjust_locker`, `distribute_to_student` |
-| quantity                | INTEGER     | positive for adds/transfers/distributions; signed delta for adjustments                     |
-| source_location         | STRING      | nullable                                                                                    |
-| destination_location    | STRING      | nullable                                                                                    |
-| performed_by_user_id    | INTEGER FK  | → `users.id`                                                                                |
-| performed_by_user_name  | STRING      | denormalized                                                                                |
-| timestamp               | DATETIME    |                                                                                             |
-| note                    | STRING      | nullable                                                                                    |
+Unchanged from the previous spec — see commit history for full schemas.
 
-### `distributions`  (Shareable Food Log)
-A single pickup event for one student covering one or more foods.
+## 6. Sidebar navigation by role
 
-| Column                  | Type        | Notes                       |
-|-------------------------|-------------|-----------------------------|
-| id                      | INTEGER PK  |                             |
-| student_id              | INTEGER FK  | → `users.id`                |
-| student_name            | STRING      | denormalized                |
-| performed_by_user_id    | INTEGER FK  | → `users.id` (admin)        |
-| performed_by_user_name  | STRING      | denormalized                |
-| timestamp               | DATETIME    |                             |
-| note                    | STRING      | nullable                    |
+| Sidebar group  | Admin | Manager | Sub-food Student | Std. Student |
+|----------------|:-----:|:-------:|:----------------:|:------------:|
+| Dashboard      |   ✅   |    ✅   |        ✅         |       ✅      |
+| Users          |   ✅   |    ✅   |        —         |       —      |
+| Food Items     |   ✅   |    ✅   |        —         |       —      |
+| Warehouse      |   ✅   |    ✅   |        —         |       —      |
+| Locker         |   ✅   |    ✅   |        —         |       —      |
+| Transfer Stock |   ✅   |    ✅   |        —         |       —      |
+| Shareable Log  |   ✅   |    ✅   |        —         |       —      |
+| Inventory Log  |   ✅   |    ✅   |        —         |       —      |
+| Food Availability |  —  |    —   |        ✅         |       —      |
+| My Profile     |   ✅   |    ✅   |        ✅         |       ✅      |
+| Coming-soon × 5|   ✅   |    ✅   |        ✅         |       ✅      |
 
-### `distribution_items`
-The per-food line items of a distribution (snapshot of stock after pickup).
+## 7. Food Items page UX
 
-| Column                  | Type        | Notes                                |
-|-------------------------|-------------|--------------------------------------|
-| id                      | INTEGER PK  |                                      |
-| distribution_id         | INTEGER FK  | → `distributions.id` (cascade delete)|
-| food_id                 | INTEGER FK  | → `food_items.id`                    |
-| food_name               | STRING      | denormalized                         |
-| quantity                | INTEGER     | positive                             |
-| locker_qty_after        | INTEGER     | snapshot for the shareable log       |
-| warehouse_qty_after     | INTEGER     | snapshot for the shareable log       |
+The page shows one row per food item with a clean layout:
 
-## 5. Main workflows
+- Name, Category, Threshold, Warehouse, Locker, Status, Actions.
+- The **Warehouse** and **Locker** column headers are clickable
+  shortcut links that open the corresponding inventory pages.
+- Active/Inactive uses subtle pill badges.
+- Items below threshold show a "Low locker stock" warning chip on the
+  name cell.
 
-### 5.1 Admin onboarding
-1. Admin logs in (seeded account or one created by another admin).
-2. Lands on the dashboard with summary cards and low-stock alerts.
+## 8. Future expansion
 
-### 5.2 Stocking & distribution
-1. Admin creates a food item (name, category, threshold).
-2. Admin adds a quantity to the **warehouse** (`add_to_warehouse`).
-3. Admin transfers a quantity from warehouse → **locker**
-   (`transfer_to_locker`); transfer cannot exceed warehouse stock.
-4. Admin records a **student pickup** on the Shareable Food Log page.
-   Multiple foods picked up by the same student in one visit are stored
-   as a single `Distribution` (one row in the log) but each line still
-   produces an `inventory_logs` `distribute_to_student` entry for audit.
-5. Locker quantity ≤ threshold triggers the low-stock alert on the dashboard.
+Sidebar placeholders for the following modules; they all currently render
+a "Coming soon" page.
 
-### 5.3 Membership management
-1. Admin opens the Students page.
-2. Admin can add/edit/delete students and toggle their
-   `is_sub_food_member` flag with a single click.
+| Module                        | New routes               |
+|-------------------------------|--------------------------|
+| Borrowing system              | `/borrowing/...`         |
+| Requests to International Dept| `/requests/...`          |
+| Announcements                 | `/announcements/...`     |
+| Common Group Chat             | `/chat/...`              |
+| Cleaning Sessions             | `/cleaning/...`          |
 
-### 5.4 Profile (any user)
-- Logged-in users open `/profile` to update their name, email, and password.
-- Email is validated; password change requires the current password and a
-  matching confirmation.
-
-### 5.5 Student day-to-day
-1. Student logs in (or self-registers).
-2. Lands on a neutral dashboard showing membership badge, info tiles, and
-   currently-available locker food.
-3. Students cannot edit anything inventory-related.
-
-### 5.6 Sharing the food log
-- Filter the `Shareable Food Log` page by a date range.
-- A plain-text representation is generated server-side
-  (`Apr 29, 2026 | Mekan | Chicken Mayo: 1, Noodles: 1, Rice: 1`).
-- One click copies the text to the clipboard.
-- A second button downloads a CSV of the same range.
-
-### 5.7 Audit
-- Every inventory change creates an `inventory_logs` row including who did
-  it, when, the action type, source/destination, and an optional note.
-- Admins can review the last 500 entries on the Inventory History page.
-
-## 6. Future expansion plan
-
-Sidebar placeholders are already wired up for the following modules; they
-all currently render a "Coming soon" page.
-
-| Module                        | Adds to data model                           | New routes               |
-|-------------------------------|----------------------------------------------|--------------------------|
-| Borrowing system              | `resources`, `borrow_records`                | `/borrowing/...`         |
-| Requests to International Dept| `requests`, `request_messages`               | `/requests/...`          |
-| Announcements                 | `announcements`                              | `/announcements/...`     |
-| Common Group Chat             | `messages`, `chat_rooms`                     | `/chat/...`              |
-| Cleaning Sessions             | `cleaning_tasks`, `cleaning_assignments`     | `/cleaning/...`          |
-
-Each module follows the same pattern as the food module:
-- a model section in `models.py`,
-- an admin-side blueprint for management,
-- a student-facing blueprint for read/interact actions,
-- templates under `templates/<module>/`,
-- a sidebar nav section grouped logically.
+Each module follows the same blueprint pattern as the food module.

@@ -10,15 +10,17 @@
 - Workflow `Start application` → `python app.py`
 - Listens on host `0.0.0.0`, port `5000` (Replit webview)
 - DB is created and seeded on first start (see `seed.py`)
+- Additive schema migration (`app._migrate_schema`) runs on every start so
+  existing SQLite databases pick up new columns without losing data.
 
 ## Layout
 ```
-app.py            entry / app factory + coming-soon route
-models.py         User, FoodItem, InventoryLog, Distribution, DistributionItem
-auth.py           login / register / logout
-admin.py          admin blueprint (mounted at /admin)
-student.py        student blueprint (mounted at /student)
-profile.py        profile blueprint (mounted at /profile)
+app.py            entry / app factory + coming-soon route + schema migration
+models.py         User (with phone/privacy/protection flags), FoodItem, ...
+auth.py           login (by email or student_id) / register / logout
+admin.py          admin & manager blueprint (mounted at /admin)
+student.py        student blueprint (general dashboard + food page)
+profile.py        profile + dedicated password change form
 seed.py           demo data
 templates/        Jinja templates
 static/css/       stylesheet
@@ -26,32 +28,45 @@ docs/             project spec
 ```
 
 ## Demo accounts
-- Admin: `admin@school.com` / `admin123`
-- Student: `student1@school.com` / `student123` (member)
-- Student: `student2@school.com` / `student123` (non-member)
-- Student: `student3@school.com` / `student123` (member)
+- Admin (protected): `admin@school.com` / `admin123`
+- Manager: `manager@school.com` / `manager123`
+- Sub-food student: `student1@school.com` (or `S001`) / `student123`
+- Non-member student: `student2@school.com` (or `S002`) / `student123`
+- Sub-food student: `student3@school.com` (or `S003`) / `student123`
+
+You can sign in with the email or the student ID.
+
+## Roles
+- **admin** — full access, can promote/demote/reset password.
+- **manager** — operational access (users, food, inventory, distributions,
+  logs); cannot touch admin/manager rows or reset passwords.
+- **student** — personal dashboard + profile. Food page only when
+  `is_sub_food_member`.
 
 ## Conventions
 - Add new feature modules as **Flask blueprints** under their own file.
-- Inventory mutations always go through helper `_log_action(...)` in `admin.py`
-  so an `inventory_logs` row is created for every change — including pickups
-  recorded via the Shareable Food Log.
+- Inventory mutations always go through `_log_action(...)` so an
+  `inventory_logs` row is created for every change.
 - Quantity inputs are validated server-side: integers, non-negative,
   transfers and pickups cannot exceed available stock.
-- Admin pages use the `@admin_required` decorator. The student dashboard
-  blocks admins so the two views stay semantically separate.
-- The profile route only mutates `name`, `email`, and `password_hash`;
-  `role`, `is_sub_food_member`, and `student_id` are off-limits by design.
-- Bootstrap modals are placed **outside** `<tbody>` tags — putting them
-  inside causes the browser to silently relocate them and break the trigger.
+- Protected users (`is_protected = true`) cannot be modified, demoted,
+  or deleted by anyone other than themselves through `/profile`.
+- The system always keeps at least one admin (`_admin_count()` guard).
+- Bootstrap modals are placed **outside** `<tbody>` tags.
+- `current_user.is_staff` includes admin AND manager. Use that for nav and
+  permission gating; use `is_admin` for admin-only paths.
 
 ## Recent changes
-- Renamed the app to **International Lounge** in all surfaces.
-- Fixed silent food-item edit bug (modals were inside `<tbody>`).
-- Added `/profile` for self-service name/email/password edits.
-- Added Distribution + DistributionItem models for the Shareable Food Log.
-- Added sidebar placeholders for upcoming modules.
-- Removed the "limited access" warning from the student dashboard.
+- Login by **email or student ID** (single `identifier` field).
+- Added **manager** role with operational access but no role/password mgmt.
+- Added **phone_number** + **show_phone_number** privacy toggle.
+- Added **is_protected** flag for developer accounts.
+- Added **admin password reset** action (temporary password).
+- Profile now has a **separate password change form** (current/new/confirm).
+- Non-sub-food students no longer see any food UI or sidebar items.
+- Renamed `/admin/students` → `/admin/users` with role filter.
+- Polished Food Items page (clickable Warehouse/Locker headers, badges).
+- Added additive SQLite migration so existing DBs upgrade in place.
 
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a
