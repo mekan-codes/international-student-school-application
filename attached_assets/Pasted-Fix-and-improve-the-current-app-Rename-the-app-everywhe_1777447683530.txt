@@ -1,0 +1,105 @@
+Fix and improve the current app.
+
+Rename the app everywhere to:
+International Lounge
+
+Important:
+Do not rebuild the whole project from scratch.
+Keep the existing structure and update the current code.
+
+Main fixes:
+
+1. Food item editing bug
+- Fix the issue where admin cannot adjust/edit food items.
+- Admin should be able to edit:
+  - food name
+  - category
+  - low_stock_threshold
+  - active/inactive status
+- Admin should also be able to adjust warehouse quantity and locker quantity safely.
+- Prevent negative quantities.
+- Every quantity adjustment must create an inventory log.
+
+2. Student profile panel
+Add a profile page for students.
+Students should be able to update:
+- name
+- email
+- password
+
+Rules:
+- Student cannot change their role.
+- Student cannot change is_sub_food_member.
+- Student cannot edit inventory.
+- After updating profile, show success message.
+- Validate email and password.
+
+3. Remove unnecessary non-member warning
+Currently non-substitute-food students see:
+"You are not currently registered for the substitute food program, so your access may be limited. Please contact an admin to join."
+
+Remove this message.
+Instead, show a neutral dashboard without mentioning limited access.
+Students should still see general app info and available features.
+
+4. Admin shareable substitute food log
+Add an admin page or section called:
+Shareable Food Log
+
+Purpose:
+Admins need an easy method to share a daily/weekly substitute food log.
+
+The log should show:
+- date
+- student name
+- foods taken
+- quantity of each food
+- remaining warehouse quantity
+- remaining locker quantity if possible
+
+Important grouping rule:
+If one student takes multiple foods at the same time/date, group them into ONE row, not separate rows.
+
+Example row:
+April 29, 2026 | Mekan | Chicken Mayo: 1, Noodles: 1, Rice: 1
+
+Do not show it as three separate entries.
+
+Add:
+- date filter
+- copy-to-clipboard button
+- export/download as CSV if simple
+- readable plain-text format for sharing
+
+5. Future modules placeholders
+Add sidebar/menu placeholders for future modules, but do not fully implement them yet:
+- Borrowing
+- Requests to International Department
+- Announcements
+- Common Group Chat
+
+For now, these pages can show:
+"Coming soon"
+
+6. README and docs update
+Update README.md and docs/project-spec.md:
+- app name: International Lounge
+- V1 focus: substitute food management
+- current features
+- planned future features:
+  - borrowing system
+  - requests to international department
+  - announcements
+  - common group chat
+  - cleaning sessions
+
+7. Keep role-based access
+- Admin pages must stay protected.
+- Students must not access admin-only inventory editing pages.
+- Profile page should be available to logged-in students and admins if appropriate.
+
+After changes, summarize:
+- files changed
+- bugs fixed
+- new pages added
+- how to test everything
