@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block title %}My Profile{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><strong>Edit your profile</strong></div>
+      <div class="card-body">
+        <form method="post">
+          <div class="mb-3">
+            <label class="form-label">Full name</label>
+            <input class="form-control" name="name" value="{{ current_user.name }}" required>
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Email</label>
+            <input class="form-control" type="email" name="email"
+                   autocomplete="email" value="{{ current_user.email }}" required>
+          </div>
+
+          <hr class="my-4">
+          <h6 class="text-muted text-uppercase small mb-3">Change password (optional)</h6>
+
+          <div class="mb-3">
+            <label class="form-label">Current password</label>
+            <input class="form-control" type="password" name="current_password"
+                   autocomplete="current-password"
+                   placeholder="Required only if changing password">
+          </div>
+          <div class="row">
+            <div class="col-md-6 mb-3">
+              <label class="form-label">New password</label>
+              <input class="form-control" type="password" name="new_password"
+                     autocomplete="new-password" minlength="6"
+                     placeholder="At least 6 characters">
+            </div>
+            <div class="col-md-6 mb-3">
+              <label class="form-label">Confirm new password</label>
+              <input class="form-control" type="password" name="confirm_password"
+                     autocomplete="new-password" minlength="6">
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save changes
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><strong>Account details</strong></div>
+      <div class="card-body">
+        <dl class="profile-dl mb-0">
+          <dt>Role</dt>
+          <dd>
+            {% if current_user.is_admin %}
+              <span class="badge bg-primary">Admin</span>
+            {% else %}
+              <span class="badge bg-secondary">Student</span>
+            {% endif %}
+          </dd>
+
+          {% if current_user.student_id %}
+          <dt>Student ID</dt>
+          <dd>{{ current_user.student_id }}</dd>
+          {% endif %}
+
+          {% if not current_user.is_admin %}
+          <dt>Substitute food program</dt>
+          <dd>
+            {% if current_user.is_sub_food_member %}
+              <span class="badge bg-success">Member</span>
+            {% else %}
+              <span class="badge bg-secondary">Not a member</span>
+            {% endif %}
+          </dd>
+          {% endif %}
+
+          <dt>Joined</dt>
+          <dd>{{ current_user.created_at.strftime('%b %d, %Y') }}</dd>
+        </dl>
+        <p class="text-muted small mt-3 mb-0">
+          Role and program membership can only be changed by an admin.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
