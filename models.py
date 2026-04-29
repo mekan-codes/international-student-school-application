@@ -76,9 +76,19 @@ class FoodItem(db.Model):
     warehouse_quantity = db.Column(db.Integer, nullable=False, default=0)
     locker_quantity = db.Column(db.Integer, nullable=False, default=0)
 
+    # Nutrition (optional; "Calories not listed" if unset)
+    calories_per_serving = db.Column(db.Integer, nullable=True)
+    serving_size = db.Column(db.String(60), nullable=True)
+
     @property
     def is_low_stock(self) -> bool:
         return self.locker_quantity <= self.low_stock_threshold
+
+    @property
+    def calories_display(self) -> str:
+        if self.calories_per_serving is None:
+            return "Calories not listed"
+        return f"{self.calories_per_serving} kcal / serving"
 
 
 class InventoryLog(db.Model):

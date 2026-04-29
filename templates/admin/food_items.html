@@ -8,7 +8,7 @@
       <strong>Food Items</strong>
       <div class="small text-muted">
         Manage what is being tracked. Click <em>Warehouse</em> or <em>Locker</em>
-        in the table header to jump to those pages.
+        in any row to jump to those pages.
       </div>
     </div>
     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addFood">
@@ -19,8 +19,9 @@
     <table class="table table-hover align-middle mb-0 food-items-table">
       <thead>
         <tr>
-          <th>Name</th>
+          <th>Food</th>
           <th>Category</th>
+          <th>Calories</th>
           <th class="text-end">Threshold</th>
           <th class="text-end">
             <a class="header-link" href="{{ url_for('admin.warehouse') }}"
@@ -43,6 +44,9 @@
         <tr>
           <td>
             <div class="fw-semibold">{{ f.name }}</div>
+            {% if f.serving_size %}
+              <div class="small text-muted">Serving: {{ f.serving_size }}</div>
+            {% endif %}
             {% if f.is_low_stock and f.is_active %}
               <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
                 <i class="bi bi-exclamation-triangle"></i> Low locker stock
@@ -50,10 +54,24 @@
             {% endif %}
           </td>
           <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+          <td>
+            {% if f.calories_per_serving is not none %}
+              <span class="fw-semibold">{{ f.calories_per_serving }}</span>
+              <span class="text-muted small">kcal{% if f.serving_size %} / serving{% endif %}</span>
+            {% else %}
+              <span class="text-muted small">Calories not listed</span>
+            {% endif %}
+          </td>
           <td class="text-end">{{ f.low_stock_threshold }}</td>
-          <td class="text-end">{{ f.warehouse_quantity }}</td>
+          <td class="text-end">
+            <a class="cell-link" href="{{ url_for('admin.warehouse') }}">
+              {{ f.warehouse_quantity }}
+            </a>
+          </td>
           <td class="text-end {% if f.is_low_stock %}text-danger fw-semibold{% endif %}">
-            {{ f.locker_quantity }}
+            <a class="cell-link" href="{{ url_for('admin.locker') }}">
+              {{ f.locker_quantity }}
+            </a>
           </td>
           <td>
             {% if f.is_active %}
@@ -80,7 +98,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No food items yet.</td></tr>
+        <tr><td colspan="8" class="text-center text-muted py-4">No food items yet.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -102,6 +120,22 @@
         <input class="form-control mb-2" name="name" value="{{ f.name }}" required>
         <label class="form-label">Category</label>
         <input class="form-control mb-2" name="category" value="{{ f.category }}">
+        <div class="row">
+          <div class="col-md-6">
+            <label class="form-label">Calories per serving
+              <small class="text-muted">(optional)</small></label>
+            <input class="form-control mb-2" type="number" min="0"
+                   name="calories_per_serving"
+                   value="{{ f.calories_per_serving if f.calories_per_serving is not none else '' }}"
+                   placeholder="e.g. 250">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Serving size
+              <small class="text-muted">(optional)</small></label>
+            <input class="form-control mb-2" name="serving_size"
+                   value="{{ f.serving_size or '' }}" placeholder="e.g. 100g">
+          </div>
+        </div>
         <label class="form-label">Low-stock threshold</label>
         <input class="form-control mb-2" type="number" min="0"
                name="low_stock_threshold" value="{{ f.low_stock_threshold }}">
@@ -132,6 +166,19 @@
         <input class="form-control mb-2" name="name" required>
         <label class="form-label">Category</label>
         <input class="form-control mb-2" name="category" placeholder="e.g. grain, protein">
+        <div class="row">
+          <div class="col-md-6">
+            <label class="form-label">Calories per serving
+              <small class="text-muted">(optional)</small></label>
+            <input class="form-control mb-2" type="number" min="0"
+                   name="calories_per_serving" placeholder="e.g. 250">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Serving size
+              <small class="text-muted">(optional)</small></label>
+            <input class="form-control mb-2" name="serving_size" placeholder="e.g. 100g">
+          </div>
+        </div>
         <label class="form-label">Low-stock threshold</label>
         <input class="form-control mb-2" type="number" min="0" value="0"
                name="low_stock_threshold">

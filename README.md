@@ -26,10 +26,14 @@ The project structure already accommodates future modules.
 
 #### Admin features
 - Dashboard with summary cards and low-stock alerts.
-- **User management** with role badges, role filter, edit, delete,
-  promote/demote, and password reset.
-- Food item catalog (add / edit / delete / activate). Column headers for
-  *Warehouse* and *Locker* link directly to those pages.
+- **User management** — every user row has a single **Manage** button
+  that opens a consolidated panel with edit profile, change role,
+  toggle substitute-food membership, reset password, and a clearly
+  separated *Danger zone* delete action with confirmation.
+- Food item catalog (add / edit / delete / activate) with **calories per
+  serving** and optional **serving size**. *Warehouse* and *Locker*
+  column headers — and the per-row quantity cells — are clickable
+  shortcuts to those pages.
 - Warehouse inventory (add stock, safe quantity adjustment).
 - Locker inventory (safe quantity adjustment).
 - Stock transfer (warehouse → locker, with validation).
@@ -45,10 +49,16 @@ The project structure already accommodates future modules.
 - Cannot create managers (admin-only) — managers can only add students.
 
 #### Student features
-- **Sub-food member students** see a Food Availability page in addition to
-  their dashboard and profile.
-- **Standard (non-member) students** see only a neutral general dashboard
-  and profile — no mention of the substitute food program.
+- All students see a clean general dashboard and profile. **Internal
+  classifications** (role label, "program subscription", "substitute
+  food membership", "limited access") are never shown to students.
+- **Sub-food member students** also see a *Lounge Locker* page listing
+  what's currently available, including calories per serving and serving
+  size when set ("Calories not listed" otherwise).
+- **Standard (non-member) students** see only the general dashboard and
+  profile — no food links anywhere in the sidebar.
+- The student profile shows only the basics: name, student ID, email,
+  phone number (if added), plus profile-edit and password-change forms.
 
 ### Planned future features (placeholders shown in the sidebar)
 - Borrowing system
@@ -111,8 +121,9 @@ The app is configured to run automatically inside Replit.
 2. The **Start application** workflow runs `python app.py` and binds to
    port `5000` (host `0.0.0.0`) — the Replit preview opens automatically.
 3. The SQLite database (`instance/app.db`) is created and seeded on first
-   run. Existing databases are auto-migrated to add the new
-   `phone_number`, `show_phone_number`, and `is_protected` columns.
+   run. Existing databases are auto-migrated to add the user columns
+   (`phone_number`, `show_phone_number`, `is_protected`) and the new
+   food columns (`calories_per_serving`, `serving_size`).
 4. Log in with one of the demo accounts above.
 
 To run locally:
@@ -166,26 +177,37 @@ python app.py
 Use the seeded accounts:
 
 1. **Admin** (`admin@school.com` / `admin123`)
-   - Open *Users* → see all roles. Promote a student to manager,
-     demote them back, reset a password, delete a user. Try to delete
-     yourself or the protected admin → blocked.
-   - Use every inventory page; record a pickup on Shareable Food Log.
+   - Open *Users* → every row has one **Manage** button. Open it for a
+     student and try each section: edit profile, promote to manager,
+     toggle membership, reset password, delete (in the *Danger zone*).
+   - Try to delete yourself or the protected admin → blocked.
+   - On *Food Items*, add a new item with calories per serving and a
+     serving size; verify the row shows the calories column. Click
+     a *Warehouse* or *Locker* quantity → it jumps to that page.
 
 2. **Manager** (`manager@school.com` / `manager123`)
-   - Open *Users* → can edit students only; admin/manager rows show
-     no edit/promote/reset/delete actions. Adding a user only allows
-     the *Student* role.
-   - Full access to food, warehouse, locker, transfer, distributions, logs.
+   - Open *Users* → only student rows show a **Manage** button.
+     Admin and manager rows display *Protected* / *—* and have no
+     edit/promote/reset/delete actions.
+   - The Manage panel for a student shows profile edit and substitute-
+     food toggle, but no role-change or password-reset sections (admin
+     only). The Add User form only allows the *Student* role.
+   - Full access to food, warehouse, locker, transfer, distributions,
+     logs.
 
 3. **Sub-food student** (`student1@school.com` / `student123`)
-   - Sidebar shows *My Dashboard*, *Food Availability*, *My Profile*,
-     and the coming-soon items.
-   - Profile lets you update name, email, phone, privacy, password.
+   - Sidebar shows *My Dashboard*, *Lounge Locker*, *My Profile*, and
+     the coming-soon items. No role label appears anywhere.
+   - *Lounge Locker* lists items in stock with calories per serving and
+     serving size when set, or "Calories not listed" otherwise.
+   - Profile shows only name, student ID, email, and phone number;
+     password change requires current + new + confirm.
 
 4. **Standard student** (`student2@school.com` / `student123`)
    - Sidebar shows *My Dashboard*, *My Profile*, and the coming-soon items.
-   - **No food links anywhere.** Direct visit to `/student/food` redirects
-     back with a flash.
+   - **No food links anywhere.** Direct visit to `/student/food` silently
+     redirects back to the dashboard.
+   - Dashboard never mentions roles, programs, membership, or limits.
 
 You can also log any student in by their student ID — e.g.
 `S002` / `student123`.

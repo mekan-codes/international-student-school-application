@@ -17,22 +17,35 @@ from seed import seed_database
 
 def _migrate_schema() -> None:
     """Best-effort additive migration so we don't lose existing demo data
-    when new columns are added to the User model. SQLite-friendly."""
+    when new columns are added. SQLite-friendly."""
     inspector = inspect(db.engine)
-    if "users" not in inspector.get_table_names():
-        return
-    cols = {c["name"] for c in inspector.get_columns("users")}
+    table_names = set(inspector.get_table_names())
     statements = []
-    if "phone_number" not in cols:
-        statements.append("ALTER TABLE users ADD COLUMN phone_number VARCHAR(40)")
-    if "show_phone_number" not in cols:
-        statements.append(
-            "ALTER TABLE users ADD COLUMN show_phone_number BOOLEAN NOT NULL DEFAULT 0"
-        )
-    if "is_protected" not in cols:
-        statements.append(
-            "ALTER TABLE users ADD COLUMN is_protected BOOLEAN NOT NULL DEFAULT 0"
-        )
+
+    if "users" in table_names:
+        user_cols = {c["name"] for c in inspector.get_columns("users")}
+        if "phone_number" not in user_cols:
+            statements.append("ALTER TABLE users ADD COLUMN phone_number VARCHAR(40)")
+        if "show_phone_number" not in user_cols:
+            statements.append(
+                "ALTER TABLE users ADD COLUMN show_phone_number BOOLEAN NOT NULL DEFAULT 0"
+            )
+        if "is_protected" not in user_cols:
+            statements.append(
+                "ALTER TABLE users ADD COLUMN is_protected BOOLEAN NOT NULL DEFAULT 0"
+            )
+
+    if "food_items" in table_names:
+        food_cols = {c["name"] for c in inspector.get_columns("food_items")}
+        if "calories_per_serving" not in food_cols:
+            statements.append(
+                "ALTER TABLE food_items ADD COLUMN calories_per_serving INTEGER"
+            )
+        if "serving_size" not in food_cols:
+            statements.append(
+                "ALTER TABLE food_items ADD COLUMN serving_size VARCHAR(60)"
+            )
+
     if not statements:
         return
     with db.engine.begin() as conn:

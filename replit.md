@@ -57,16 +57,28 @@ You can sign in with the email or the student ID.
   permission gating; use `is_admin` for admin-only paths.
 
 ## Recent changes
+- Users page redesigned: **single Manage button per row** opens a
+  consolidated modal (profile edit, role change, membership toggle,
+  password reset, separated *Danger zone* delete).
+- Food items now have **calories_per_serving** and **serving_size**
+  columns (nullable). Schema migration adds them automatically.
+- Food Items page shows a **Calories** column and per-row clickable
+  Warehouse/Locker quantity cells.
+- Sub-food student page renamed to **Lounge Locker** and now displays
+  calories per serving + serving size; falls back to "Calories not
+  listed" when unset.
+- Students never see internal classification labels (role, "program
+  subscription", "substitute food membership", etc.) anywhere.
+- Student profile shows only name, student ID, email, phone — no role
+  or membership rows.
 - Login by **email or student ID** (single `identifier` field).
 - Added **manager** role with operational access but no role/password mgmt.
 - Added **phone_number** + **show_phone_number** privacy toggle.
 - Added **is_protected** flag for developer accounts.
 - Added **admin password reset** action (temporary password).
-- Profile now has a **separate password change form** (current/new/confirm).
-- Non-sub-food students no longer see any food UI or sidebar items.
+- Profile has a **separate password change form** (current/new/confirm).
 - Renamed `/admin/students` → `/admin/users` with role filter.
-- Polished Food Items page (clickable Warehouse/Locker headers, badges).
-- Added additive SQLite migration so existing DBs upgrade in place.
+- Additive SQLite migration on every start.
 
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a
