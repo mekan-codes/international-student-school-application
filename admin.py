@@ -350,15 +350,34 @@ def food_items():
     return render_template("admin/food_items.html", items=items)
 
 
+def _parse_calories(raw: str | None) -> tuple[bool, int | None, str]:
+    """Return (ok, value-or-None, error_message)."""
+    raw = (raw or "").strip()
+    if not raw:
+        return True, None, ""
+    try:
+        v = int(raw)
+    except ValueError:
+        return False, None, "Calories per serving must be a whole number."
+    if v < 0:
+        return False, None, "Calories per serving must be zero or greater."
+    return True, v, ""
+
+
 @admin_bp.route("/food-items/add", methods=["POST"])
 @staff_required
 def add_food_item():
     name = (request.form.get("name") or "").strip()
     category = (request.form.get("category") or "general").strip()
+    serving_size = (request.form.get("serving_size") or "").strip() or None
     try:
         threshold = max(0, int(request.form.get("low_stock_threshold") or 0))
     except ValueError:
         flash("Threshold must be a non-negative integer.", "danger")
+        return redirect(url_for("admin.food_items"))
+    cal_ok, calories, cal_err = _parse_calories(request.form.get("calories_per_serving"))
+    if not cal_ok:
+        flash(cal_err, "danger")
         return redirect(url_for("admin.food_items"))
 
     if not name:
@@ -368,7 +387,10 @@ def add_food_item():
         flash("A food item with that name already exists.", "danger")
         return redirect(url_for("admin.food_items"))
 
-    item = FoodItem(name=name, category=category, low_stock_threshold=threshold)
+    item = FoodItem(
+        name=name, category=category, low_stock_threshold=threshold,
+        calories_per_serving=calories, serving_size=serving_size,
+    )
     db.session.add(item)
     db.session.commit()
     flash(f"Created food item: {name}.", "success")
@@ -396,6 +418,12 @@ def edit_food_item(item_id):
     except ValueError:
         flash("Threshold must be a non-negative integer.", "danger")
         return redirect(url_for("admin.food_items"))
+    cal_ok, calories, cal_err = _parse_calories(request.form.get("calories_per_serving"))
+    if not cal_ok:
+        flash(cal_err, "danger")
+        return redirect(url_for("admin.food_items"))
+    item.calories_per_serving = calories
+    item.serving_size = (request.form.get("serving_size") or "").strip() or None
     item.is_active = bool(request.form.get("is_active"))
     db.session.commit()
     flash(f"Updated food item: {item.name}.", "success")

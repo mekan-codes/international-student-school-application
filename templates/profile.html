@@ -80,39 +80,50 @@
       <div class="card-header"><strong>Account details</strong></div>
       <div class="card-body">
         <dl class="profile-dl mb-0">
-          <dt>Role</dt>
-          <dd>
-            {% if current_user.is_admin %}
-              <span class="badge bg-primary">Admin</span>
-            {% elif current_user.is_manager %}
-              <span class="badge bg-info text-dark">Manager</span>
-            {% else %}
-              <span class="badge bg-secondary">Student</span>
-            {% endif %}
-          </dd>
+          <dt>Name</dt>
+          <dd>{{ current_user.name }}</dd>
 
           {% if current_user.student_id %}
           <dt>Student ID</dt>
           <dd>{{ current_user.student_id }}</dd>
           {% endif %}
 
-          {% if current_user.role == 'student' %}
-          <dt>Substitute food program</dt>
+          <dt>Email</dt>
+          <dd>{{ current_user.email }}</dd>
+
+          <dt>Phone number</dt>
           <dd>
-            {% if current_user.is_sub_food_member %}
-              <span class="badge bg-success">Member</span>
+            {% if current_user.phone_number %}
+              {{ current_user.phone_number }}
+              {% if not current_user.show_phone_number %}
+                <span class="text-muted small">
+                  (<i class="bi bi-eye-slash"></i> hidden from others)
+                </span>
+              {% endif %}
             {% else %}
-              <span class="badge bg-secondary">Not a member</span>
+              <span class="text-muted">Not set</span>
             {% endif %}
           </dd>
-          {% endif %}
 
-          <dt>Joined</dt>
-          <dd>{{ current_user.created_at.strftime('%b %d, %Y') }}</dd>
+          {% if current_user.is_staff %}
+            {# Staff still see role + joined date for ops context. #}
+            <dt>Role</dt>
+            <dd>
+              {% if current_user.is_admin %}
+                <span class="badge bg-primary">Admin</span>
+              {% else %}
+                <span class="badge bg-info text-dark">Manager</span>
+              {% endif %}
+            </dd>
+            <dt>Joined</dt>
+            <dd>{{ current_user.created_at.strftime('%b %d, %Y') }}</dd>
+          {% endif %}
         </dl>
+        {% if current_user.is_staff %}
         <p class="text-muted small mt-3 mb-0">
-          Role, program membership, and student ID can only be changed by an admin or manager.
+          Role and student ID can only be changed by an admin.
         </p>
+        {% endif %}
       </div>
     </div>
   </div>

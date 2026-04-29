@@ -115,9 +115,27 @@ expected to change it from their own profile after first login.
 The bold rows are **new in this iteration**; existing SQLite DBs are
 migrated additively at startup (see `app._migrate_schema`).
 
-### `food_items`, `inventory_logs`, `distributions`, `distribution_items`
+### `food_items`
 
-Unchanged from the previous spec — see commit history for full schemas.
+| Column                   | Type     | Notes                              |
+|--------------------------|----------|------------------------------------|
+| id                       | INTEGER PK |                                  |
+| name                     | STRING (unique) |                             |
+| category                 | STRING   | default `general`                  |
+| low_stock_threshold      | INTEGER  | default 0                          |
+| is_active                | BOOLEAN  | default true                       |
+| warehouse_quantity       | INTEGER  | default 0                          |
+| locker_quantity          | INTEGER  | default 0                          |
+| **calories_per_serving** | INTEGER  | nullable; renders "Calories not listed" if unset |
+| **serving_size**         | STRING   | nullable; free text e.g. "100g" or "1 cup" |
+| created_at               | DATETIME |                                    |
+
+Bold rows are **new in this iteration** and are added to existing
+SQLite databases by `app._migrate_schema`.
+
+### `inventory_logs`, `distributions`, `distribution_items`
+
+Unchanged — see commit history for full schemas.
 
 ## 6. Sidebar navigation by role
 
@@ -131,7 +149,7 @@ Unchanged from the previous spec — see commit history for full schemas.
 | Transfer Stock |   ✅   |    ✅   |        —         |       —      |
 | Shareable Log  |   ✅   |    ✅   |        —         |       —      |
 | Inventory Log  |   ✅   |    ✅   |        —         |       —      |
-| Food Availability |  —  |    —   |        ✅         |       —      |
+| Lounge Locker  |   —   |    —   |        ✅         |       —      |
 | My Profile     |   ✅   |    ✅   |        ✅         |       ✅      |
 | Coming-soon × 5|   ✅   |    ✅   |        ✅         |       ✅      |
 
@@ -139,14 +157,63 @@ Unchanged from the previous spec — see commit history for full schemas.
 
 The page shows one row per food item with a clean layout:
 
-- Name, Category, Threshold, Warehouse, Locker, Status, Actions.
-- The **Warehouse** and **Locker** column headers are clickable
-  shortcut links that open the corresponding inventory pages.
+- Food (name + serving size), Category, **Calories**, Threshold,
+  Warehouse, Locker, Status, Actions.
+- The **Warehouse** and **Locker** column headers — and each row's
+  Warehouse / Locker quantity cell — are clickable shortcuts to the
+  matching inventory page.
+- Calories column shows `<n> kcal / serving` when set, or
+  `Calories not listed` when null.
 - Active/Inactive uses subtle pill badges.
 - Items below threshold show a "Low locker stock" warning chip on the
   name cell.
+- The Add and Edit modals expose Name, Category, **Calories per serving**
+  (optional), **Serving size** (optional), Low-stock threshold, and
+  the active/inactive toggle.
 
-## 8. Future expansion
+## 8. Users page UX
+
+The Users table has a **single Manage button per row**. Clicking it
+opens a consolidated modal with the following sections, each rendered
+only when the current viewer is allowed to use it:
+
+1. **Profile information** — edit name, email, student ID (students),
+   and substitute-food membership flag (students).
+2. **Role** (admin only) — promote student → manager, or demote
+   manager → student. Shown only when applicable.
+3. **Substitute food program** — toggle membership for students.
+4. **Password** (admin only) — set a temporary password. The current
+   password is never shown.
+5. **Danger zone** — delete the user, visually separated and behind a
+   `confirm()` dialog. Hidden for self and for admins/managers when the
+   viewer is a manager.
+
+Other rules:
+
+- **Protected** users (e.g. seeded admin) show no Manage button — only
+  a `Protected` indicator. They can still edit themselves via Profile.
+- The system always keeps at least one admin: deleting the last admin
+  is refused.
+- Managers can never affect admin or manager rows: those rows show no
+  Manage button at all.
+
+## 9. Student-facing rules
+
+To keep the student experience friendly, students never see internal
+classification labels:
+
+- No role badge ("Student") in the sidebar user chip or profile card.
+- No mention of "program subscription", "substitute food membership",
+  "limited access", or any internal admin classification.
+- Standard students see no food links anywhere; `/student/food` is
+  reachable only by sub-food members and silently redirects others.
+- Sub-food members see a *Lounge Locker* page (renamed from "Food
+  Availability") with name, category, available quantity, calories per
+  serving, and serving size when set.
+- The student profile lists only name, student ID, email, phone number,
+  and the edit/password forms — no role row, no membership row.
+
+## 10. Future expansion
 
 Sidebar placeholders for the following modules; they all currently render
 a "Coming soon" page.

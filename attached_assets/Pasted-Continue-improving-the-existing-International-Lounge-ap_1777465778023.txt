@@ -1,0 +1,210 @@
+Continue improving the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the project from scratch.
+- Modify the existing code only.
+- Keep the app runnable.
+- Preserve existing data structure unless migration is necessary.
+- Focus on UI cleanup, user roles, profile behavior, and food item improvements.
+
+Main fixes and improvements:
+
+1. Clean up Users page UI
+The current Users page has too many small action buttons in one row and looks messy.
+
+Change it so each user row has only one main action button:
+
+Button label:
+Manage
+
+When admin or manager clicks Manage, open a modal or side panel.
+
+Inside the Manage panel, include all user actions:
+- edit user profile information
+- change role if allowed
+- toggle substitute food membership if allowed
+- reset password
+- delete user if allowed
+
+Rules:
+- dangerous actions like delete should be visually separated
+- confirm before delete
+- keep at least one admin account
+- manager cannot promote/demote admins
+- manager cannot create admins
+- manager cannot delete admins
+- admin can promote/demote managers
+- admin can reset user passwords
+- admin cannot see old/current passwords
+
+2. Hide internal role/program information from students
+Students should not see:
+- their role label
+- “program subscription”
+- “substitute food membership”
+- “limited access”
+- any internal admin classification
+
+For normal students:
+- show a simple general dashboard
+- do not show food-related information
+- do not show substitute-food-related messages
+- do not show food pages in sidebar
+
+For substitute-food students:
+- show available locker foods
+- do not show role/program/membership labels
+- just show food availability naturally
+
+For students, profile should show only:
+- name
+- student ID
+- email
+- phone number if added
+- profile edit option
+
+3. Add calories to food items
+Food items should include calories information.
+
+Add fields:
+- calories_per_serving
+- serving_size, optional if easy
+
+Admin/manager should be able to add/edit:
+- food name
+- category
+- low stock threshold
+- active/inactive status
+- calories per serving
+- serving size if implemented
+
+Students viewing available locker food should see:
+- food name
+- category
+- quantity available
+- calories per serving
+- serving size if available
+
+If calories are unknown, show:
+Calories not listed
+
+4. Improve Food Items page frontend
+Make Food Items page visually cleaner.
+
+Each food item should clearly show:
+- name
+- category
+- calories per serving
+- serving size if available
+- low stock threshold
+- active/inactive status
+- warehouse quantity
+- locker quantity
+
+Make Warehouse and Locker labels/quantities clickable:
+- clicking Warehouse goes to Warehouse page
+- clicking Locker goes to Locker page
+
+Keep edit/delete controls clean and not crowded.
+
+5. Improve role organization
+Use three roles:
+- admin
+- manager
+- student
+
+Admin:
+- highest control
+- can manage users
+- can promote/demote managers
+- can reset passwords
+- can access all management pages
+
+Manager:
+- daily operation role
+- can manage food items
+- can manage warehouse/locker inventory
+- can transfer stock
+- can view/export logs
+- can manage students for food operations
+- cannot create admins
+- cannot demote admins
+- cannot delete admins
+
+Student:
+- can access own dashboard/profile
+- if substitute-food student, can view food availability
+- if normal student, should not see food system
+
+Important:
+Keep at least one admin account at all times.
+Prevent deleting or demoting the last admin.
+
+6. Improve password/profile behavior
+Students and users changing their own password must enter:
+- current password
+- new password
+- confirm new password
+
+Rules:
+- current password must be correct
+- new password and confirm password must match
+- show clear success/error messages
+
+Admins can reset a user's password:
+- admin enters a temporary new password
+- old password is never shown
+- password should not be visible in user table
+
+7. Phone number privacy
+Users can add/edit:
+- phone_number
+- show_phone_number true/false
+
+Students can hide their phone number.
+Only show phone number publicly if show_phone_number is true.
+
+Do not build chat yet.
+This is only preparation for future profile/contact features.
+
+8. Update app wording
+Make sure app name is consistently:
+International Lounge
+
+Avoid saying:
+ISS Support
+Substitute food program subscription
+Limited access
+Program subscription
+
+Use more natural wording for student pages.
+
+9. Future modules remain placeholders
+Keep these as “Coming soon” pages only:
+- Borrowing
+- Requests to International Department
+- Announcements
+- Common Group Chat
+- Cleaning Sessions
+
+Do not fully implement them yet.
+
+10. Update documentation
+Update README.md and docs/project-spec.md with:
+- app name: International Lounge
+- current V1 scope
+- roles: admin, manager, student
+- manager permissions
+- calories field for food items
+- user profile/password rules
+- phone number privacy
+- future planned modules
+
+After implementation, summarize:
+1. files changed
+2. database/schema changes
+3. UI changes
+4. how to test admin flow
+5. how to test manager flow
+6. how to test normal student flow
+7. how to test substitute-food student flow

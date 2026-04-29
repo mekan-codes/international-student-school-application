@@ -1,10 +1,10 @@
 {% extends "base.html" %}
-{% block title %}Food Availability{% endblock %}
+{% block title %}Lounge Locker{% endblock %}
 
 {% block content %}
 <div class="card mb-4">
   <div class="card-body">
-    <h4 class="mb-1"><i class="bi bi-archive"></i> Available Locker Food</h4>
+    <h4 class="mb-1"><i class="bi bi-archive"></i> Available in the lounge locker</h4>
     <p class="text-muted mb-0">
       Read-only view of what's currently in the lounge locker.
       Pickups are recorded by lounge staff.
@@ -22,10 +22,28 @@
           <h5 class="card-title mb-1">{{ f.name }}</h5>
           <span class="badge bg-secondary">{{ f.category }}</span>
         </div>
-        <p class="text-muted mb-3">In locker</p>
+        <p class="text-muted small mb-3">In locker</p>
         <div class="qty-row">
           <span class="qty">{{ f.locker_quantity }}</span>
           <span class="qty-label">available</span>
+        </div>
+        <hr class="my-3">
+        <div class="small">
+          {% if f.calories_per_serving is not none %}
+            <div>
+              <i class="bi bi-fire text-warning"></i>
+              <strong>{{ f.calories_per_serving }}</strong> kcal / serving
+            </div>
+          {% else %}
+            <div class="text-muted">
+              <i class="bi bi-fire"></i> Calories not listed
+            </div>
+          {% endif %}
+          {% if f.serving_size %}
+            <div class="text-muted">
+              <i class="bi bi-cup-straw"></i> Serving: {{ f.serving_size }}
+            </div>
+          {% endif %}
         </div>
       </div>
     </div>

@@ -30,8 +30,6 @@ def member_required(view):
     @login_required
     def wrapped(*args, **kwargs):
         if current_user.is_staff or not current_user.is_sub_food_member:
-            flash("This page is only available to substitute food program members.",
-                  "warning")
             return redirect(url_for("student.dashboard"))
         return view(*args, **kwargs)
     return wrapped
