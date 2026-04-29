@@ -1,15 +1,21 @@
 """
-Admin routes: dashboard, student management, food items, inventory, transfers, logs.
-All routes are protected and require an authenticated user with role='admin'.
+Admin routes: dashboard, student management, food items, inventory, transfers,
+distributions, shareable log, and inventory history.
+All routes are protected by @admin_required.
 """
 from functools import wraps
-from datetime import datetime
+from datetime import datetime, date, timedelta
+import csv
+import io
 
-from flask import Blueprint, render_template, request, redirect, url_for, flash, abort
+from flask import (
+    Blueprint, render_template, request, redirect, url_for, flash, abort,
+    Response,
+)
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
-from models import db, User, FoodItem, InventoryLog
+from models import db, User, FoodItem, InventoryLog, Distribution, DistributionItem
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -203,13 +209,26 @@ def add_food_item():
 @admin_required
 def edit_food_item(item_id):
     item = FoodItem.query.get_or_404(item_id)
-    item.name = (request.form.get("name") or item.name).strip()
-    item.category = (request.form.get("category") or item.category).strip()
+
+    new_name = (request.form.get("name") or "").strip()
+    if not new_name:
+        flash("Food name cannot be empty.", "danger")
+        return redirect(url_for("admin.food_items"))
+    # Avoid unique-constraint violation
+    if new_name != item.name:
+        existing = FoodItem.query.filter_by(name=new_name).first()
+        if existing and existing.id != item.id:
+            flash("Another food item already uses that name.", "danger")
+            return redirect(url_for("admin.food_items"))
+    item.name = new_name
+    item.category = (request.form.get("category") or item.category).strip() or "general"
+
     try:
         item.low_stock_threshold = max(0, int(request.form.get("low_stock_threshold") or 0))
     except ValueError:
         flash("Threshold must be a non-negative integer.", "danger")
         return redirect(url_for("admin.food_items"))
+
     item.is_active = bool(request.form.get("is_active"))
     db.session.commit()
     flash(f"Updated food item: {item.name}.", "success")
@@ -264,15 +283,19 @@ def adjust_warehouse():
     """Manually set warehouse quantity (e.g. for corrections)."""
     item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
     try:
-        new_qty = int(request.form.get("new_quantity") or -1)
-    except ValueError:
+        new_qty = int(request.form.get("new_quantity"))
+    except (ValueError, TypeError):
         flash("Quantity must be an integer.", "danger")
         return redirect(url_for("admin.warehouse"))
     if new_qty < 0:
-        flash("Quantity cannot be negative.", "danger")
+        flash("Warehouse quantity cannot be negative.", "danger")
         return redirect(url_for("admin.warehouse"))
 
     delta = new_qty - item.warehouse_quantity
+    if delta == 0:
+        flash("No change — warehouse quantity is already that value.", "info")
+        return redirect(url_for("admin.warehouse"))
+
     item.warehouse_quantity = new_qty
     _log_action(item, "adjust_warehouse", delta, source="warehouse",
                 destination="warehouse",
@@ -297,15 +320,19 @@ def locker():
 def adjust_locker():
     item = FoodItem.query.get_or_404(int(request.form.get("food_id") or 0))
     try:
-        new_qty = int(request.form.get("new_quantity") or -1)
-    except ValueError:
+        new_qty = int(request.form.get("new_quantity"))
+    except (ValueError, TypeError):
         flash("Quantity must be an integer.", "danger")
         return redirect(url_for("admin.locker"))
     if new_qty < 0:
-        flash("Quantity cannot be negative.", "danger")
+        flash("Locker quantity cannot be negative.", "danger")
         return redirect(url_for("admin.locker"))
 
     delta = new_qty - item.locker_quantity
+    if delta == 0:
+        flash("No change — locker quantity is already that value.", "info")
+        return redirect(url_for("admin.locker"))
+
     item.locker_quantity = new_qty
     _log_action(item, "adjust_locker", delta, source="locker",
                 destination="locker",
@@ -349,6 +376,220 @@ def transfer():
 
     items = FoodItem.query.filter_by(is_active=True).order_by(FoodItem.name).all()
     return render_template("admin/transfer.html", items=items)
+
+
+# --------------------------------------------------------------------------- #
+# Distributions / Shareable Food Log                                          #
+# --------------------------------------------------------------------------- #
+def _parse_date(value: str | None) -> date | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+@admin_bp.route("/distributions", methods=["GET", "POST"])
+@admin_required
+def distributions():
+    """Record a food pickup for a student (locker quantities decrease) and
+    show the Shareable Food Log."""
+
+    if request.method == "POST":
+        # ---- Build the pickup ----
+        try:
+            student_id = int(request.form.get("student_id") or 0)
+        except ValueError:
+            flash("Invalid student.", "danger")
+            return redirect(url_for("admin.distributions"))
+
+        student = User.query.filter_by(id=student_id, role="student").first()
+        if not student:
+            flash("Student not found.", "danger")
+            return redirect(url_for("admin.distributions"))
+
+        # Form sends parallel lists food_id[] and quantity[]
+        food_ids = request.form.getlist("food_id[]")
+        quantities = request.form.getlist("quantity[]")
+        note = (request.form.get("note") or "").strip()
+
+        # Normalize and aggregate (in case the same food appears twice)
+        line_map: dict[int, int] = {}
+        for fid, qty in zip(food_ids, quantities):
+            if not fid or not qty:
+                continue
+            try:
+                fid_i = int(fid)
+                qty_i = int(qty)
+            except ValueError:
+                flash("Invalid quantity entered.", "danger")
+                return redirect(url_for("admin.distributions"))
+            if qty_i <= 0:
+                continue
+            line_map[fid_i] = line_map.get(fid_i, 0) + qty_i
+
+        if not line_map:
+            flash("Please add at least one food and quantity.", "danger")
+            return redirect(url_for("admin.distributions"))
+
+        # Validate that locker stock is sufficient for every item BEFORE writing
+        items = {f.id: f for f in FoodItem.query.filter(FoodItem.id.in_(line_map.keys())).all()}
+        for fid, qty in line_map.items():
+            f = items.get(fid)
+            if not f:
+                flash("One of the selected foods no longer exists.", "danger")
+                return redirect(url_for("admin.distributions"))
+            if qty > f.locker_quantity:
+                flash(
+                    f"Cannot give {qty} of {f.name} — only {f.locker_quantity} in the locker.",
+                    "danger",
+                )
+                return redirect(url_for("admin.distributions"))
+
+        # Create the distribution event
+        dist = Distribution(
+            student_id=student.id,
+            student_name=student.name,
+            performed_by_user_id=current_user.id,
+            performed_by_user_name=current_user.name,
+            note=note or None,
+            timestamp=datetime.utcnow(),
+        )
+        db.session.add(dist)
+        db.session.flush()  # get dist.id
+
+        for fid, qty in line_map.items():
+            f = items[fid]
+            f.locker_quantity -= qty  # decrement stock
+            db.session.add(DistributionItem(
+                distribution_id=dist.id,
+                food_id=f.id,
+                food_name=f.name,
+                quantity=qty,
+                locker_qty_after=f.locker_quantity,
+                warehouse_qty_after=f.warehouse_quantity,
+            ))
+            # Also write a row to inventory_logs so every stock change is audited
+            _log_action(
+                f, "distribute_to_student", qty,
+                source="locker", destination=f"student:{student.name}",
+                note=f"Distribution #{dist.id}",
+            )
+
+        db.session.commit()
+        flash(f"Recorded pickup for {student.name}.", "success")
+        return redirect(url_for("admin.distributions"))
+
+    # ---- GET: list distributions, with optional date filter ----
+    students_list = (User.query.filter_by(role="student")
+                     .order_by(User.name).all())
+    foods_list = (FoodItem.query.filter_by(is_active=True)
+                  .order_by(FoodItem.name).all())
+
+    start_d = _parse_date(request.args.get("start"))
+    end_d = _parse_date(request.args.get("end"))
+
+    q = Distribution.query
+    if start_d:
+        q = q.filter(Distribution.timestamp >= datetime.combine(start_d, datetime.min.time()))
+    if end_d:
+        # inclusive end-of-day
+        q = q.filter(Distribution.timestamp < datetime.combine(end_d + timedelta(days=1),
+                                                               datetime.min.time()))
+
+    dists = q.order_by(Distribution.timestamp.desc()).limit(500).all()
+
+    # Build the plain-text shareable representation
+    text_lines = []
+    for d in dists:
+        items_str = ", ".join(f"{i.food_name}: {i.quantity}" for i in d.items)
+        text_lines.append(
+            f"{d.timestamp.strftime('%b %d, %Y')} | {d.student_name} | {items_str}"
+        )
+    shareable_text = "\n".join(text_lines) if text_lines else "(no pickups in this range)"
+
+    return render_template(
+        "admin/distributions.html",
+        students=students_list,
+        foods=foods_list,
+        distributions=dists,
+        start=request.args.get("start", ""),
+        end=request.args.get("end", ""),
+        shareable_text=shareable_text,
+    )
+
+
+@admin_bp.route("/distributions/export.csv")
+@admin_required
+def export_distributions_csv():
+    """Download the distribution log as CSV (one row per student-pickup,
+    foods grouped into a single column)."""
+    start_d = _parse_date(request.args.get("start"))
+    end_d = _parse_date(request.args.get("end"))
+
+    q = Distribution.query
+    if start_d:
+        q = q.filter(Distribution.timestamp >= datetime.combine(start_d, datetime.min.time()))
+    if end_d:
+        q = q.filter(Distribution.timestamp < datetime.combine(end_d + timedelta(days=1),
+                                                               datetime.min.time()))
+    dists = q.order_by(Distribution.timestamp.desc()).all()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow([
+        "Date", "Time", "Student", "Foods Taken (food: qty)",
+        "Locker Remaining (per food)", "Warehouse Remaining (per food)", "Note",
+    ])
+    for d in dists:
+        foods_taken = "; ".join(f"{i.food_name}: {i.quantity}" for i in d.items)
+        locker_remaining = "; ".join(
+            f"{i.food_name}: {i.locker_qty_after if i.locker_qty_after is not None else '-'}"
+            for i in d.items
+        )
+        warehouse_remaining = "; ".join(
+            f"{i.food_name}: {i.warehouse_qty_after if i.warehouse_qty_after is not None else '-'}"
+            for i in d.items
+        )
+        writer.writerow([
+            d.timestamp.strftime("%Y-%m-%d"),
+            d.timestamp.strftime("%H:%M"),
+            d.student_name,
+            foods_taken,
+            locker_remaining,
+            warehouse_remaining,
+            d.note or "",
+        ])
+
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=shareable-food-log.csv"},
+    )
+
+
+@admin_bp.route("/distributions/<int:dist_id>/delete", methods=["POST"])
+@admin_required
+def delete_distribution(dist_id):
+    """Delete a recorded pickup and restore the locker stock."""
+    dist = Distribution.query.get_or_404(dist_id)
+    foods = {f.id: f for f in FoodItem.query.filter(
+        FoodItem.id.in_([i.food_id for i in dist.items])).all()}
+
+    for item in dist.items:
+        f = foods.get(item.food_id)
+        if f is not None:
+            f.locker_quantity += item.quantity
+            _log_action(
+                f, "adjust_locker", item.quantity,
+                source="locker", destination="locker",
+                note=f"Reversed distribution #{dist.id}",
+            )
+    db.session.delete(dist)
+    db.session.commit()
+    flash("Pickup deleted and stock restored.", "info")
+    return redirect(url_for("admin.distributions"))
 
 
 # --------------------------------------------------------------------------- #

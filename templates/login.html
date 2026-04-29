@@ -4,18 +4,20 @@
 {% block auth_content %}
 <div class="auth-card">
   <div class="auth-brand">
-    <i class="bi bi-globe2"></i>
-    <span>ISS Support</span>
+    <i class="bi bi-house-heart"></i>
+    <span>International Lounge</span>
   </div>
   <h2>Welcome back</h2>
   <p class="muted">Sign in to your account to continue.</p>
 
   <form method="post">
     <label>Email</label>
-    <input type="email" name="email" required autofocus placeholder="you@school.com">
+    <input type="email" name="email" required autofocus
+           autocomplete="email" placeholder="you@school.com">
 
     <label>Password</label>
-    <input type="password" name="password" required placeholder="••••••••">
+    <input type="password" name="password" required
+           autocomplete="current-password" placeholder="••••••••">
 
     <button type="submit" class="btn btn-primary w-100 mt-3">Sign in</button>
   </form>

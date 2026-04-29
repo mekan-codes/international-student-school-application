@@ -1,5 +1,5 @@
 """
-Database models for International Student School Support App.
+Database models for International Lounge.
 Uses Flask-SQLAlchemy with SQLite for simple, persistent storage.
 """
 from datetime import datetime
@@ -62,7 +62,7 @@ class InventoryLog(db.Model):
     food_id = db.Column(db.Integer, db.ForeignKey("food_items.id"), nullable=False)
     food_name = db.Column(db.String(120), nullable=False)
     action_type = db.Column(db.String(40), nullable=False)
-    # add_to_warehouse | transfer_to_locker | adjust_warehouse | adjust_locker
+    # add_to_warehouse | transfer_to_locker | adjust_warehouse | adjust_locker | distribute_to_student
     quantity = db.Column(db.Integer, nullable=False)
     source_location = db.Column(db.String(40), nullable=True)
     destination_location = db.Column(db.String(40), nullable=True)
@@ -70,3 +70,38 @@ class InventoryLog(db.Model):
     performed_by_user_name = db.Column(db.String(120), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     note = db.Column(db.String(255), nullable=True)
+
+
+class Distribution(db.Model):
+    """A single 'pickup' event: one student takes one or more foods at the same time.
+    Used by the Shareable Food Log."""
+    __tablename__ = "distributions"
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    student_name = db.Column(db.String(120), nullable=False)  # denormalized
+    performed_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    performed_by_user_name = db.Column(db.String(120), nullable=False)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    note = db.Column(db.String(255), nullable=True)
+
+    items = db.relationship(
+        "DistributionItem",
+        backref="distribution",
+        cascade="all, delete-orphan",
+        order_by="DistributionItem.id",
+    )
+
+
+class DistributionItem(db.Model):
+    """A single food line within a Distribution event."""
+    __tablename__ = "distribution_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    distribution_id = db.Column(db.Integer, db.ForeignKey("distributions.id"), nullable=False)
+    food_id = db.Column(db.Integer, db.ForeignKey("food_items.id"), nullable=False)
+    food_name = db.Column(db.String(120), nullable=False)  # denormalized
+    quantity = db.Column(db.Integer, nullable=False)
+    # Snapshot of stock right after the pickup, for the shareable log
+    locker_qty_after = db.Column(db.Integer, nullable=True)
+    warehouse_qty_after = db.Column(db.Integer, nullable=True)

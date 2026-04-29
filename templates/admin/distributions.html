@@ -1,0 +1,198 @@
+{% extends "base.html" %}
+{% block title %}Shareable Food Log{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  {# ============== Record a new pickup ============== #}
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><strong>Record a Food Pickup</strong></div>
+      <div class="card-body">
+        <form method="post" id="pickupForm">
+          <label class="form-label">Student</label>
+          <select class="form-select mb-3" name="student_id" required>
+            <option value="" disabled selected>Choose a student…</option>
+            {% for s in students %}
+              <option value="{{ s.id }}">
+                {{ s.name }} ({{ s.student_id }}){% if s.is_sub_food_member %} ★{% endif %}
+              </option>
+            {% endfor %}
+          </select>
+
+          <label class="form-label d-block">Foods taken</label>
+          <div id="lineItems">
+            <div class="input-group mb-2 line-item">
+              <select name="food_id[]" class="form-select" required>
+                <option value="" disabled selected>Choose food…</option>
+                {% for f in foods %}
+                  <option value="{{ f.id }}">{{ f.name }} (locker: {{ f.locker_quantity }})</option>
+                {% endfor %}
+              </select>
+              <input type="number" name="quantity[]" class="form-control" min="1"
+                     value="1" placeholder="Qty" style="max-width: 90px" required>
+              <button type="button" class="btn btn-outline-secondary remove-line"
+                      title="Remove">×</button>
+            </div>
+          </div>
+          <button type="button" id="addLine" class="btn btn-sm btn-outline-secondary mb-3">
+            <i class="bi bi-plus-lg"></i> Add another food
+          </button>
+
+          <label class="form-label">Note (optional)</label>
+          <input class="form-control mb-3" name="note" placeholder="e.g. lunch pickup">
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-bag-check"></i> Record pickup
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ============== Filters & shareable text ============== #}
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><strong>Filter & Share</strong></div>
+      <div class="card-body">
+        <form method="get" class="row g-2 align-items-end">
+          <div class="col-sm-4">
+            <label class="form-label small">From date</label>
+            <input type="date" name="start" value="{{ start }}" class="form-control">
+          </div>
+          <div class="col-sm-4">
+            <label class="form-label small">To date</label>
+            <input type="date" name="end" value="{{ end }}" class="form-control">
+          </div>
+          <div class="col-sm-4 d-flex gap-2">
+            <button class="btn btn-outline-primary flex-grow-1" type="submit">
+              <i class="bi bi-funnel"></i> Filter
+            </button>
+            <a class="btn btn-outline-secondary"
+               href="{{ url_for('admin.distributions') }}" title="Clear">
+              <i class="bi bi-x-lg"></i>
+            </a>
+          </div>
+        </form>
+
+        <hr class="my-3">
+
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <strong class="small text-muted text-uppercase">Plain-text share format</strong>
+          <div class="d-flex gap-2">
+            <button id="copyShare" type="button" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-clipboard"></i> Copy to clipboard
+            </button>
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ url_for('admin.export_distributions_csv', start=start, end=end) }}">
+              <i class="bi bi-download"></i> Export CSV
+            </a>
+          </div>
+        </div>
+        <textarea id="shareText" class="form-control share-text"
+                  rows="6" readonly>{{ shareable_text }}</textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ============== Distribution log table ============== #}
+<div class="card mt-3">
+  <div class="card-header">
+    <strong>Pickup Log</strong>
+    <span class="text-muted small">— newest first</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Date</th>
+          <th>Student</th>
+          <th>Foods Taken</th>
+          <th>Locker Remaining</th>
+          <th>Recorded By</th>
+          <th class="text-end">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for d in distributions %}
+        <tr>
+          <td class="text-nowrap">
+            <strong>{{ d.timestamp.strftime('%b %d, %Y') }}</strong>
+            <div class="small text-muted">{{ d.timestamp.strftime('%H:%M') }}</div>
+          </td>
+          <td>{{ d.student_name }}</td>
+          <td>
+            {% for i in d.items %}
+              <span class="badge bg-light text-dark border me-1 mb-1">
+                {{ i.food_name }}: {{ i.quantity }}
+              </span>
+            {% endfor %}
+            {% if d.note %}
+              <div class="small text-muted mt-1"><i class="bi bi-sticky"></i> {{ d.note }}</div>
+            {% endif %}
+          </td>
+          <td>
+            {% for i in d.items %}
+              <div class="small">
+                {{ i.food_name }}:
+                <strong>{{ i.locker_qty_after if i.locker_qty_after is not none else '—' }}</strong>
+              </div>
+            {% endfor %}
+          </td>
+          <td><small>{{ d.performed_by_user_name }}</small></td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('admin.delete_distribution', dist_id=d.id) }}"
+                  class="d-inline"
+                  onsubmit="return confirm('Delete this pickup and restore stock?');">
+              <button class="btn btn-sm btn-outline-danger" type="submit">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No pickups recorded in this range.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // ----- Add / remove food line items -----
+  const lineItems = document.getElementById("lineItems");
+  document.getElementById("addLine").addEventListener("click", () => {
+    const first = lineItems.querySelector(".line-item");
+    const clone = first.cloneNode(true);
+    clone.querySelectorAll("select, input").forEach(el => {
+      if (el.tagName === "SELECT") el.selectedIndex = 0;
+      else el.value = el.type === "number" ? "1" : "";
+    });
+    lineItems.appendChild(clone);
+  });
+  lineItems.addEventListener("click", (e) => {
+    if (e.target.closest(".remove-line")) {
+      const items = lineItems.querySelectorAll(".line-item");
+      if (items.length > 1) e.target.closest(".line-item").remove();
+    }
+  });
+
+  // ----- Copy plain-text share format to clipboard -----
+  document.getElementById("copyShare").addEventListener("click", async () => {
+    const ta = document.getElementById("shareText");
+    try {
+      await navigator.clipboard.writeText(ta.value);
+      const btn = document.getElementById("copyShare");
+      const orig = btn.innerHTML;
+      btn.innerHTML = '<i class="bi bi-check2"></i> Copied!';
+      setTimeout(() => (btn.innerHTML = orig), 1500);
+    } catch (err) {
+      // fallback
+      ta.select();
+      document.execCommand("copy");
+    }
+  });
+</script>
+{% endblock %}

@@ -1,15 +1,16 @@
 """
-International Student School Support App - Main Application Entry Point
+International Lounge — Main Application Entry Point
 Version 1: Substitute Food Management Module
 """
 import os
-from flask import Flask, redirect, url_for
-from flask_login import LoginManager, current_user
+from flask import Flask, redirect, url_for, render_template
+from flask_login import LoginManager, current_user, login_required
 
 from models import db, User
 from auth import auth_bp
 from admin import admin_bp
 from student import student_bp
+from profile import profile_bp
 from seed import seed_database
 
 
@@ -18,7 +19,6 @@ def create_app():
 
     # ----- Configuration -----
     app.config["SECRET_KEY"] = os.environ.get("SESSION_SECRET", "dev-secret-change-me")
-    # SQLite database stored in the instance folder
     db_path = os.path.join(app.instance_path, "app.db")
     os.makedirs(app.instance_path, exist_ok=True)
     app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{db_path}"
@@ -40,6 +40,7 @@ def create_app():
     app.register_blueprint(auth_bp)
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(student_bp, url_prefix="/student")
+    app.register_blueprint(profile_bp)
 
     # ----- Root route: redirect based on role -----
     @app.route("/")
@@ -49,6 +50,20 @@ def create_app():
         if current_user.role == "admin":
             return redirect(url_for("admin.dashboard"))
         return redirect(url_for("student.dashboard"))
+
+    # ----- Future-module placeholders (Coming soon) -----
+    @app.route("/coming-soon/<module>")
+    @login_required
+    def coming_soon(module):
+        modules = {
+            "borrowing": "Borrowing",
+            "requests": "Requests to International Department",
+            "announcements": "Announcements",
+            "chat": "Common Group Chat",
+            "cleaning": "Cleaning Sessions",
+        }
+        title = modules.get(module, "Coming soon")
+        return render_template("coming_soon.html", module_title=title)
 
     # ----- Initialize DB and seed data -----
     with app.app_context():
