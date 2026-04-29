@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Inventory Logs{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <strong>Inventory History</strong>
+    <span class="text-muted small">— newest first, last 500 entries</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Time</th>
+          <th>Food</th>
+          <th>Action</th>
+          <th class="text-end">Qty</th>
+          <th>From → To</th>
+          <th>By</th>
+          <th>Note</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for l in logs %}
+        <tr>
+          <td class="text-nowrap"><small>{{ l.timestamp.strftime('%Y-%m-%d %H:%M') }}</small></td>
+          <td>{{ l.food_name }}</td>
+          <td>
+            {% set color = {
+              'add_to_warehouse': 'success',
+              'transfer_to_locker': 'primary',
+              'adjust_warehouse': 'secondary',
+              'adjust_locker': 'secondary'
+            }.get(l.action_type, 'secondary') %}
+            <span class="badge bg-{{ color }}">{{ l.action_type.replace('_', ' ') }}</span>
+          </td>
+          <td class="text-end">{{ l.quantity }}</td>
+          <td>
+            <small>{{ l.source_location or '—' }} → {{ l.destination_location or '—' }}</small>
+          </td>
+          <td><small>{{ l.performed_by_user_name }}</small></td>
+          <td><small class="text-muted">{{ l.note or '' }}</small></td>
+        </tr>
+        {% else %}
+        <tr><td colspan="7" class="text-center text-muted py-4">No history yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

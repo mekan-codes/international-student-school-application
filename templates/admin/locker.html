@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}Locker{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header"><strong>Locker Inventory</strong></div>
+  <div class="table-responsive">
+    <table class="table table-hover align-middle mb-0">
+      <thead>
+        <tr>
+          <th>Food</th><th>Category</th>
+          <th class="text-end">Locker Qty</th>
+          <th class="text-end">Threshold</th>
+          <th>Status</th>
+          <th class="text-end">Adjust</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in items %}
+        <tr>
+          <td>{{ f.name }}</td>
+          <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+          <td class="text-end fw-semibold">{{ f.locker_quantity }}</td>
+          <td class="text-end">{{ f.low_stock_threshold }}</td>
+          <td>
+            {% if f.is_low_stock %}
+              <span class="badge bg-warning text-dark">Low</span>
+            {% else %}
+              <span class="badge bg-success">OK</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <form method="post" action="{{ url_for('admin.adjust_locker') }}"
+                  class="d-flex justify-content-end gap-1">
+              <input type="hidden" name="food_id" value="{{ f.id }}">
+              <input type="number" min="0" name="new_quantity"
+                     class="form-control form-control-sm"
+                     style="width: 90px" value="{{ f.locker_quantity }}">
+              <button class="btn btn-sm btn-outline-primary" type="submit">Set</button>
+            </form>
+          </td>
+        </tr>
+        {% else %}
+        <tr><td colspan="6" class="text-center text-muted py-4">No food items.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

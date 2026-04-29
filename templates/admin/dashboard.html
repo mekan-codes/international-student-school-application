@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Admin Dashboard{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-label">Total Students</div>
+      <div class="stat-value">{{ total_students }}</div>
+      <i class="bi bi-people stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-label">Sub-Food Members</div>
+      <div class="stat-value">{{ sub_food_members }}</div>
+      <i class="bi bi-person-check stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-label">Food Types</div>
+      <div class="stat-value">{{ total_food_types }}</div>
+      <i class="bi bi-box2 stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-label">Warehouse Stock</div>
+      <div class="stat-value">{{ total_warehouse }}</div>
+      <i class="bi bi-building stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card">
+      <div class="stat-label">Locker Stock</div>
+      <div class="stat-value">{{ total_locker }}</div>
+      <i class="bi bi-archive stat-icon"></i>
+    </div>
+  </div>
+  <div class="col-sm-6 col-lg-4 col-xl-2">
+    <div class="stat-card {% if low_stock_items %}stat-warning{% endif %}">
+      <div class="stat-label">Low Stock Items</div>
+      <div class="stat-value">{{ low_stock_items|length }}</div>
+      <i class="bi bi-exclamation-triangle stat-icon"></i>
+    </div>
+  </div>
+</div>
+
+{% if low_stock_items %}
+<div class="card mt-4 alert-card">
+  <div class="card-header bg-warning-subtle">
+    <i class="bi bi-exclamation-triangle-fill text-warning"></i>
+    <strong>Low stock alert</strong> — these items are at or below their threshold in the locker.
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0">
+      <thead>
+        <tr>
+          <th>Food</th><th>Category</th>
+          <th class="text-end">Locker Qty</th>
+          <th class="text-end">Threshold</th>
+          <th class="text-end">Warehouse Qty</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for f in low_stock_items %}
+        <tr>
+          <td>{{ f.name }}</td>
+          <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+          <td class="text-end text-danger fw-semibold">{{ f.locker_quantity }}</td>
+          <td class="text-end">{{ f.low_stock_threshold }}</td>
+          <td class="text-end">{{ f.warehouse_quantity }}</td>
+          <td class="text-end">
+            <a class="btn btn-sm btn-outline-primary"
+               href="{{ url_for('admin.transfer') }}">Restock</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endif %}
+
+<div class="row mt-4 g-3">
+  <div class="col-md-6">
+    <a class="quick-link" href="{{ url_for('admin.students') }}">
+      <i class="bi bi-people"></i>
+      <div>
+        <strong>Manage Students</strong>
+        <p>Create, edit, and toggle membership.</p>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a class="quick-link" href="{{ url_for('admin.transfer') }}">
+      <i class="bi bi-arrow-left-right"></i>
+      <div>
+        <strong>Transfer Stock</strong>
+        <p>Move food from warehouse to locker.</p>
+      </div>
+    </a>
+  </div>
+</div>
+{% endblock %}
