@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}Warehouse{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-lg-7">
+    <div class="card">
+      <div class="card-header"><strong>Warehouse Inventory</strong></div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0">
+          <thead>
+            <tr>
+              <th>Food</th><th>Category</th>
+              <th class="text-end">Warehouse Qty</th>
+              <th class="text-end">Adjust</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for f in items %}
+            <tr>
+              <td>{{ f.name }}</td>
+              <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+              <td class="text-end fw-semibold">{{ f.warehouse_quantity }}</td>
+              <td class="text-end">
+                <form method="post" action="{{ url_for('admin.adjust_warehouse') }}"
+                      class="d-flex justify-content-end gap-1">
+                  <input type="hidden" name="food_id" value="{{ f.id }}">
+                  <input type="number" min="0" name="new_quantity"
+                         class="form-control form-control-sm"
+                         style="width: 90px" value="{{ f.warehouse_quantity }}">
+                  <button class="btn btn-sm btn-outline-primary" type="submit">Set</button>
+                </form>
+              </td>
+            </tr>
+            {% else %}
+            <tr><td colspan="4" class="text-center text-muted py-4">No food items.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="card">
+      <div class="card-header"><strong>Add Stock to Warehouse</strong></div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('admin.add_warehouse_stock') }}">
+          <label class="form-label">Food item</label>
+          <select class="form-select mb-2" name="food_id" required>
+            {% for f in items %}
+              <option value="{{ f.id }}">{{ f.name }}</option>
+            {% endfor %}
+          </select>
+          <label class="form-label">Quantity to add</label>
+          <input class="form-control mb-2" type="number" min="1" name="quantity" required>
+          <label class="form-label">Note (optional)</label>
+          <input class="form-control mb-3" name="note" placeholder="e.g. weekly delivery">
+          <button class="btn btn-primary w-100" type="submit">
+            <i class="bi bi-plus-circle"></i> Add to warehouse
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

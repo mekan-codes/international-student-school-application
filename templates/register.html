@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Register{% endblock %}
+
+{% block auth_content %}
+<div class="auth-card">
+  <div class="auth-brand">
+    <i class="bi bi-globe2"></i>
+    <span>ISS Support</span>
+  </div>
+  <h2>Create your student account</h2>
+  <p class="muted">Admins are created by other admins.</p>
+
+  <form method="post">
+    <label>Full name</label>
+    <input type="text" name="name" required>
+
+    <label>Student ID</label>
+    <input type="text" name="student_id" required>
+
+    <label>Email</label>
+    <input type="email" name="email" required>
+
+    <label>Password (min 6 chars)</label>
+    <input type="password" name="password" minlength="6" required>
+
+    <button type="submit" class="btn btn-primary w-100 mt-3">Create account</button>
+  </form>
+
+  <p class="text-center mt-3 mb-0">
+    Already registered? <a href="{{ url_for('auth.login') }}">Log in</a>
+  </p>
+</div>
+{% endblock %}

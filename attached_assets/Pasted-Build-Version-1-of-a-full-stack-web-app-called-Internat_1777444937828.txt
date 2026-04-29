@@ -1,0 +1,211 @@
+Build Version 1 of a full-stack web app called “International Student School Support App”.
+
+Purpose:
+This app is for international students at a school. Its long-term goal is to centralize systems like substitute food management, cleaning schedules, borrowing shared resources, and suggestions. However, Version 1 should focus only on the substitute food management module.
+
+Important:
+Do not build cleaning, borrowing, or suggestion board yet. Only prepare the project structure so those modules can be added later.
+
+Technology:
+Use a simple stack that works well in Replit.
+Make the project runnable immediately.
+Use a database for persistent data.
+Use clean, understandable code.
+Add comments where useful.
+
+User roles:
+1. Admin
+2. Student
+
+Student fields:
+- id
+- name
+- student_id
+- email
+- password
+- is_sub_food_member: true/false
+- created_at
+
+Admin features:
+- admin login
+- admin dashboard
+- manage students
+- add/edit/delete students
+- mark students as substitute food members
+- create/edit/delete food items
+- add stock to warehouse
+- transfer stock from warehouse to locker
+- view warehouse inventory
+- view locker inventory
+- view inventory logs/history
+- see low-stock alerts
+
+Student features:
+- student login
+- student dashboard
+- view whether they are a substitute food program member
+- view available locker food
+- see food name, category, and quantity
+- students must NOT be able to edit inventory
+
+Inventory model:
+There are two separate storage locations:
+1. Warehouse
+2. Locker
+
+Warehouse:
+- main food storage
+- managed only by admin
+
+Locker:
+- food currently available to students
+- students can view it
+- admin updates it
+
+Food item fields:
+- id
+- name
+- category
+- low_stock_threshold
+- is_active
+- created_at
+
+Inventory structure:
+Each food item should have:
+- warehouse_quantity
+- locker_quantity
+
+Inventory rules:
+- Admin can add stock to warehouse
+- Admin can transfer stock from warehouse to locker
+- When transferring stock:
+  - warehouse quantity decreases
+  - locker quantity increases
+- Prevent negative quantities
+- Validate all quantity inputs
+- Students cannot change quantities
+- Every stock change must create a log entry
+
+Inventory log fields:
+- log_id
+- food_id
+- food_name
+- action_type
+- quantity
+- source_location
+- destination_location
+- performed_by_user_id
+- performed_by_user_name
+- timestamp
+- note
+
+Action types:
+- add_to_warehouse
+- transfer_to_locker
+- adjust_warehouse
+- adjust_locker
+
+Low-stock alert:
+- If locker_quantity <= low_stock_threshold, show a clear warning on the admin dashboard
+- Show low-stock food items in a separate alert section
+
+Pages/screens:
+1. Login page
+2. Register page
+3. Admin dashboard
+4. Student dashboard
+5. Student management page
+6. Food item management page
+7. Warehouse inventory page
+8. Locker inventory page
+9. Transfer stock page
+10. Logs/history page
+
+UI requirements:
+- Clean modern dashboard design
+- Sidebar navigation
+- Separate admin and student views
+- Tables for students, food items, inventory, and logs
+- Forms for adding students, food items, and stock
+- Cards for dashboard summaries
+- Responsive layout
+- Clear error messages
+- Clear success messages
+
+Admin dashboard summary cards:
+- total students
+- substitute food members
+- total food types
+- total warehouse stock
+- total locker stock
+- number of low-stock items
+
+Student dashboard:
+- welcome message
+- membership status
+- available locker food cards/table
+- if not a substitute food member, show a message saying access may be limited
+
+Authentication:
+- Add simple login/register
+- Use role-based access control
+- Redirect admin to admin dashboard
+- Redirect student to student dashboard
+- Protect admin pages so students cannot access them
+
+Seed/demo data:
+Create sample accounts:
+1. Admin:
+   - email: admin@school.com
+   - password: admin123
+2. Student 1:
+   - email: student1@school.com
+   - password: student123
+   - is_sub_food_member: true
+3. Student 2:
+   - email: student2@school.com
+   - password: student123
+   - is_sub_food_member: false
+4. Student 3:
+   - email: student3@school.com
+   - password: student123
+   - is_sub_food_member: true
+
+Create sample food items:
+- chicken mayo
+- rice
+- noodles
+
+Add sample inventory quantities:
+- chicken mayo: warehouse 20, locker 5, low threshold 2
+- rice: warehouse 30, locker 8, low threshold 3
+- noodles: warehouse 15, locker 2, low threshold 3
+
+README:
+Create or update README.md with:
+- project name
+- project purpose
+- Version 1 scope
+- features
+- user roles
+- demo accounts
+- how to run the project
+- folder structure
+- future features:
+  - cleaning schedule
+  - borrowing/shared resources
+  - suggestion board
+
+Also create a docs/project-spec.md file with:
+- problem statement
+- Version 1 features
+- user roles
+- database/data model
+- main workflows
+- future expansion plan
+
+After generating the app, show:
+1. folder structure
+2. how to run it
+3. demo login accounts
+4. what features are completed
