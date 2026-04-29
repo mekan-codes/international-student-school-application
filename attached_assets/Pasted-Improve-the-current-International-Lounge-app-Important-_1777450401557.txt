@@ -1,0 +1,142 @@
+Improve the current International Lounge app.
+
+Important:
+Do not rebuild from scratch.
+Modify the existing code only.
+Keep current database/data if possible.
+Keep the app runnable.
+
+Fixes and improvements:
+
+1. Login with email OR student ID
+Currently login requires email.
+Change login so users can log in using either:
+- email
+- student_id
+
+The login input label should say:
+Email or Student ID
+
+Authentication rules:
+- If input matches an email, authenticate by email.
+- Otherwise authenticate by student_id.
+- Password is still required.
+
+2. Hide substitute food features from standard students
+Students who are NOT substitute food members should not see any substitute food or food-related pages.
+
+For non-sub-food students:
+- do not show locker food
+- do not show food availability
+- do not mention substitute food
+- do not show food-related sidebar/menu items
+- show a general student dashboard instead
+
+For sub-food students:
+- show food availability and related student food features.
+
+3. Add Manager role
+Add a third role:
+- admin
+- manager
+- student
+
+Manager permissions:
+- manager can do almost everything admin can do:
+  - manage students
+  - manage food items
+  - manage warehouse/locker
+  - transfer stock
+  - view logs
+  - create shareable food logs
+- manager cannot demote or promote admins
+- manager cannot delete admins
+- manager cannot change developer/admin-level protected accounts if such protection exists
+
+Admin permissions:
+- admin can promote student to manager
+- admin can demote manager to student
+- admin can reset user passwords
+- admin can manage all users except any protected developer account if implemented
+
+Important:
+Keep at least one admin account always available.
+Prevent the system from having zero admins.
+
+4. Safer password changing
+For users changing their own password:
+Add a profile password change form with:
+- current password
+- new password
+- confirm new password
+
+Rules:
+- current password must be correct
+- new password and confirm password must match
+- show clear error/success messages
+
+5. Admin password reset
+Admins should be able to reset a user password.
+
+Rules:
+- admin cannot see the old/current password
+- passwords must never be displayed in the UI
+- admin can set a temporary new password for a user
+- log or show confirmation that password was reset
+- student can later change it from profile page
+
+6. Phone number field and privacy
+Add optional phone number to user profile.
+
+User fields:
+- phone_number
+- show_phone_number: true/false
+
+Students can:
+- add/edit their phone number
+- choose whether to show or hide their phone number
+
+For now:
+- do not build chat yet
+- just store phone number and privacy setting
+- if any user directory/profile display exists, only show phone number when show_phone_number is true
+
+7. Improve Food Items frontend
+Improve the food items page.
+
+Requirements:
+- make it visually cleaner
+- show each food item with:
+  - name
+  - category
+  - low stock threshold
+  - active/inactive status
+  - warehouse quantity
+  - locker quantity
+- make Warehouse and Locker quantity labels clickable
+- clicking Warehouse should navigate to the Warehouse page
+- clicking Locker should navigate to the Locker page
+- this is only a shortcut, not the main navigation
+- keep edit/delete controls clear
+- improve spacing, tables/cards, and status badges
+
+8. Update navigation/sidebar
+Navigation should depend on role and membership:
+- admin: all admin pages
+- manager: all management pages except highest admin-only controls
+- sub-food student: student dashboard + food availability + profile
+- normal student: general dashboard + profile only
+
+9. Update docs
+Update README.md and docs/project-spec.md with:
+- login by email or student ID
+- roles: admin, manager, student
+- manager permissions
+- password reset rules
+- phone number privacy
+- role-based sidebar behavior
+
+After implementation, summarize:
+- changed files
+- new/updated database fields
+- how to test admin, manager, sub-food student, and normal student flows

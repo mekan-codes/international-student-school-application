@@ -2,21 +2,38 @@
 {% block title %}Food Items{% endblock %}
 
 {% block content %}
-<div class="card">
+<div class="card food-items-card">
   <div class="card-header d-flex justify-content-between align-items-center">
-    <strong>Food Items</strong>
+    <div>
+      <strong>Food Items</strong>
+      <div class="small text-muted">
+        Manage what is being tracked. Click <em>Warehouse</em> or <em>Locker</em>
+        in the table header to jump to those pages.
+      </div>
+    </div>
     <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addFood">
       <i class="bi bi-plus-lg"></i> Add Food Item
     </button>
   </div>
   <div class="table-responsive">
-    <table class="table table-hover align-middle mb-0">
+    <table class="table table-hover align-middle mb-0 food-items-table">
       <thead>
         <tr>
-          <th>Name</th><th>Category</th>
+          <th>Name</th>
+          <th>Category</th>
           <th class="text-end">Threshold</th>
-          <th class="text-end">Warehouse</th>
-          <th class="text-end">Locker</th>
+          <th class="text-end">
+            <a class="header-link" href="{{ url_for('admin.warehouse') }}"
+               title="Open Warehouse page">
+              Warehouse <i class="bi bi-box-arrow-up-right small"></i>
+            </a>
+          </th>
+          <th class="text-end">
+            <a class="header-link" href="{{ url_for('admin.locker') }}"
+               title="Open Locker page">
+              Locker <i class="bi bi-box-arrow-up-right small"></i>
+            </a>
+          </th>
           <th>Status</th>
           <th class="text-end">Actions</th>
         </tr>
@@ -24,7 +41,14 @@
       <tbody>
         {% for f in items %}
         <tr>
-          <td>{{ f.name }}</td>
+          <td>
+            <div class="fw-semibold">{{ f.name }}</div>
+            {% if f.is_low_stock and f.is_active %}
+              <span class="badge bg-warning-subtle text-warning border border-warning-subtle">
+                <i class="bi bi-exclamation-triangle"></i> Low locker stock
+              </span>
+            {% endif %}
+          </td>
           <td><span class="badge bg-secondary">{{ f.category }}</span></td>
           <td class="text-end">{{ f.low_stock_threshold }}</td>
           <td class="text-end">{{ f.warehouse_quantity }}</td>
@@ -33,9 +57,13 @@
           </td>
           <td>
             {% if f.is_active %}
-              <span class="badge bg-success">Active</span>
+              <span class="badge bg-success-subtle text-success">
+                <i class="bi bi-check-circle"></i> Active
+              </span>
             {% else %}
-              <span class="badge bg-secondary">Inactive</span>
+              <span class="badge bg-secondary-subtle text-secondary">
+                <i class="bi bi-pause-circle"></i> Inactive
+              </span>
             {% endif %}
           </td>
           <td class="text-end">
@@ -59,7 +87,7 @@
   </div>
 </div>
 
-{# ----- Modals (kept OUTSIDE the table so the browser does not relocate them) ----- #}
+{# ----- Modals (kept OUTSIDE the table) ----- #}
 {% for f in items %}
 <div class="modal fade" id="editFood{{ f.id }}" tabindex="-1" aria-hidden="true">
   <div class="modal-dialog">

@@ -5,6 +5,7 @@ Version 1: Substitute Food Management Module
 import os
 from flask import Flask, redirect, url_for, render_template
 from flask_login import LoginManager, current_user, login_required
+from sqlalchemy import inspect, text
 
 from models import db, User
 from auth import auth_bp
@@ -12,6 +13,31 @@ from admin import admin_bp
 from student import student_bp
 from profile import profile_bp
 from seed import seed_database
+
+
+def _migrate_schema() -> None:
+    """Best-effort additive migration so we don't lose existing demo data
+    when new columns are added to the User model. SQLite-friendly."""
+    inspector = inspect(db.engine)
+    if "users" not in inspector.get_table_names():
+        return
+    cols = {c["name"] for c in inspector.get_columns("users")}
+    statements = []
+    if "phone_number" not in cols:
+        statements.append("ALTER TABLE users ADD COLUMN phone_number VARCHAR(40)")
+    if "show_phone_number" not in cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN show_phone_number BOOLEAN NOT NULL DEFAULT 0"
+        )
+    if "is_protected" not in cols:
+        statements.append(
+            "ALTER TABLE users ADD COLUMN is_protected BOOLEAN NOT NULL DEFAULT 0"
+        )
+    if not statements:
+        return
+    with db.engine.begin() as conn:
+        for stmt in statements:
+            conn.execute(text(stmt))
 
 
 def create_app():
@@ -34,7 +60,7 @@ def create_app():
 
     @login_manager.user_loader
     def load_user(user_id):
-        return User.query.get(int(user_id))
+        return db.session.get(User, int(user_id))
 
     # ----- Blueprints -----
     app.register_blueprint(auth_bp)
@@ -47,7 +73,7 @@ def create_app():
     def index():
         if not current_user.is_authenticated:
             return redirect(url_for("auth.login"))
-        if current_user.role == "admin":
+        if current_user.is_staff:
             return redirect(url_for("admin.dashboard"))
         return redirect(url_for("student.dashboard"))
 
@@ -65,9 +91,10 @@ def create_app():
         title = modules.get(module, "Coming soon")
         return render_template("coming_soon.html", module_title=title)
 
-    # ----- Initialize DB and seed data -----
+    # ----- Initialize DB, run additive migration, seed data -----
     with app.app_context():
         db.create_all()
+        _migrate_schema()
         seed_database()
 
     return app

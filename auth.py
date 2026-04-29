@@ -1,6 +1,5 @@
 """
-Authentication routes: login, register, logout.
-Implements simple role-based access control (admin vs student).
+Authentication routes: login (by email or student_id), register, logout.
 """
 from flask import Blueprint, render_template, request, redirect, url_for, flash
 from flask_login import login_user, logout_user, login_required, current_user
@@ -16,17 +15,25 @@ def login():
         return redirect(url_for("index"))
 
     if request.method == "POST":
-        email = (request.form.get("email") or "").strip().lower()
+        identifier = (request.form.get("identifier") or "").strip()
         password = request.form.get("password") or ""
 
-        user = User.query.filter_by(email=email).first()
+        user = None
+        if identifier:
+            # If it looks like an email, look up by email; otherwise by student_id.
+            if "@" in identifier:
+                user = User.query.filter_by(email=identifier.lower()).first()
+            else:
+                user = User.query.filter_by(student_id=identifier).first()
+
         if user and user.check_password(password):
             login_user(user)
             flash(f"Welcome back, {user.name}!", "success")
-            if user.is_admin:
+            if user.is_staff:
                 return redirect(url_for("admin.dashboard"))
             return redirect(url_for("student.dashboard"))
-        flash("Invalid email or password.", "danger")
+
+        flash("Invalid email/student ID or password.", "danger")
 
     return render_template("login.html")
 
@@ -43,7 +50,6 @@ def register():
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
 
-        # Basic validation
         if not all([name, student_id, email, password]):
             flash("All fields are required.", "danger")
             return render_template("register.html")
