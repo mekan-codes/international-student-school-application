@@ -1,0 +1,51 @@
+{# Create / edit post form. #}
+{% extends "base.html" %}
+{% block title %}{% if post %}Edit post{% else %}New post{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-body">
+    <h4 class="mb-3">
+      <i class="bi bi-{% if post %}pencil-square{% else %}plus-square{% endif %}"></i>
+      {% if post %}Edit post{% else %}New post on the Lounge Board{% endif %}
+    </h4>
+
+    <form method="post" class="row g-3">
+      <div class="col-md-8">
+        <label class="form-label">Title <span class="text-danger">*</span></label>
+        <input type="text" name="title" class="form-control" required
+               maxlength="160"
+               value="{{ post.title if post else request.form.get('title','') }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">Category <span class="text-danger">*</span></label>
+        <select name="category" class="form-select" required>
+          {% set selected = post.category if post else request.form.get('category','General') %}
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if cat == selected %}selected{% endif %}>{{ cat }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="form-label">Content <span class="text-danger">*</span></label>
+        <textarea name="content" class="form-control" rows="8" required
+                  placeholder="What's on your mind?">{{ post.content if post else request.form.get('content','') }}</textarea>
+        <div class="form-text">
+          Posts are visible to every signed-in user (students and staff).
+        </div>
+      </div>
+
+      <div class="col-12 d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-check2"></i> {{ "Save changes" if post else "Publish post" }}
+        </button>
+        <a class="btn btn-outline-secondary"
+           href="{% if post %}{{ url_for('lounge_board.detail', post_id=post.id) }}{% else %}{{ url_for('lounge_board.index') }}{% endif %}">
+          Cancel
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

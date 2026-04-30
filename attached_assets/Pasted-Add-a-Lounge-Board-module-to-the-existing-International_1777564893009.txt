@@ -1,0 +1,342 @@
+Add a Lounge Board module to the existing International Lounge app and remove the old Group Chat placeholder.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve current UI style, sidebar layout, role system, and all existing features.
+- This is NOT private chat and NOT real-time chat.
+- Build it as a modern community board with posts, comments, and reactions.
+- Completely remove the Group Chat Coming Soon placeholder from the user-facing app and docs.
+- Replace it with Lounge Board everywhere.
+
+Current app context:
+International Lounge is a Flask + SQLite web app.
+Existing modules include:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile and phone privacy
+- substitute food management
+- announcements
+- requests to international department
+- shared item borrowing
+- lounge cleaning
+- useful resources
+
+==================================================
+1. REMOVE GROUP CHAT PLACEHOLDER
+==================================================
+
+Remove user-facing Group Chat placeholder completely.
+
+Update:
+- sidebar
+- coming soon sections
+- README.md
+- docs/project-spec.md
+- any templates mentioning Group Chat
+- any wording saying Common Group Chat remains planned
+
+Do not leave Group Chat visible as Coming Soon.
+
+If the generic /coming-soon/<module> route still exists for backward compatibility, that is fine, but the sidebar and docs should no longer advertise Group Chat.
+
+==================================================
+2. ADD LOUNGE BOARD MODULE
+==================================================
+
+Purpose:
+Lounge Board is a public community space for international students and staff.
+
+It is different from:
+- Announcements = official staff notices
+- Intl Dept. Requests = private support tickets to the international department
+- Lounge Board = public community posts, comments, and reactions
+
+Roles:
+All logged-in users:
+- view posts
+- create posts
+- comment on posts
+- react to posts
+- edit their own posts
+- delete their own posts
+- edit their own comments
+- delete their own comments
+
+Admin/manager:
+- delete any inappropriate post/comment
+- pin/unpin posts
+- lock/unlock posts
+- view all posts
+
+Post fields:
+- id
+- author_user_id
+- author_name
+- title
+- content
+- category
+- is_pinned
+- is_locked
+- created_at
+- updated_at
+
+Comment fields:
+- id
+- post_id
+- author_user_id
+- author_name
+- content
+- created_at
+- updated_at
+
+Reaction fields:
+- id
+- post_id
+- user_id
+- reaction_type
+
+Reaction types:
+- 👍
+- ❤️
+- 👀
+
+Categories:
+- General
+- Questions
+- Lost & Found
+- Events
+- Food
+- Dormitory
+- Other
+
+==================================================
+3. RULES AND PERMISSIONS
+==================================================
+
+Post rules:
+- title is required
+- content is required
+- category is required
+- category defaults to General if needed
+- users can edit/delete only their own posts
+- admins/managers can delete any post
+- admins/managers can pin/unpin any post
+- admins/managers can lock/unlock any post
+
+Comment rules:
+- comment content is required
+- users can edit/delete only their own comments
+- admins/managers can delete any comment
+- locked posts cannot receive new comments from normal users
+- admins/managers may still comment on locked posts if simple
+
+Reaction rules:
+- each user can have only one reaction per post
+- clicking a different reaction changes their reaction
+- clicking the same reaction again removes it
+- show reaction counts under posts
+- if possible, update reactions without full page refresh using fetch/AJAX
+- if AJAX is risky, normal form submit with refresh is acceptable
+
+Privacy rules:
+- do not show hidden phone numbers
+- do not expose internal role/program labels to students
+- do not show private profile fields
+
+==================================================
+4. PAGES / ROUTES
+==================================================
+
+Create a Lounge Board blueprint/routes.
+
+Pages:
+
+1. Lounge Board list/feed page
+- show posts as modern cards
+- show pinned posts first
+- then newest posts first
+- show author name
+- show category badge
+- show date/time near the header
+- show title
+- show content preview
+- show reaction counts
+- show comment count
+- show pinned badge if pinned
+- show locked badge if locked
+- category filter
+- search by title/content if simple
+- create post button
+- pagination if easy, 10 posts per page
+
+2. Create post page or modal
+- title
+- category
+- content
+- submit button
+
+3. Edit post page or modal
+- only author or admin/manager if supported
+- preserve permission checks
+
+4. Post detail page
+- full post
+- comments
+- add comment form if not locked or user is staff
+- reactions
+- edit/delete own post
+- edit/delete own comments
+- admin/manager moderation controls:
+  - pin/unpin
+  - lock/unlock
+  - delete post
+  - delete comments
+
+==================================================
+5. SIDEBAR
+==================================================
+
+Replace Group Chat with Lounge Board.
+
+For students:
+Communication:
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+- Lounge Board
+
+Lounge Life:
+- Shared Item Borrowing
+- Lounge Cleaning
+- Substitute Food Locker only for substitute-food students
+
+For admin/manager:
+Communication:
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+- Lounge Board
+
+Lounge Life:
+- Shared Item Borrowing
+- Lounge Cleaning
+
+Do not show Group Chat anywhere in sidebar.
+
+==================================================
+6. UI STYLE
+==================================================
+
+Make Lounge Board feel modern, not like an old forum.
+
+Use:
+- cards
+- badges
+- clean spacing
+- reaction row
+- comment count
+- clear create post button
+- clear empty state
+
+Example card structure:
+Author · time
+[Category badge] [Pinned/Locked if applicable]
+
+Title
+Content preview
+
+👍 4  ❤️ 1  👀 8   💬 2
+
+Buttons:
+- View
+- Edit only if owner
+- Delete only if owner or staff
+- Pin/Lock only if staff
+
+Date/time should appear near the post header, not inside the message body.
+
+==================================================
+7. DATA STRUCTURES / PERFORMANCE
+==================================================
+
+Because this is a data structures class project, add short comments where useful.
+
+Use:
+- database ordering and filtering instead of loading all posts and filtering manually
+- dictionaries/hash maps for reaction counts and comment counts if helpful
+- pagination for posts
+- SQL queries for category/search filtering if possible
+
+For post feed:
+- pinned posts first
+- newest posts next
+- avoid repeated queries inside template loops if possible
+
+==================================================
+8. DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Add:
+- Lounge Board module
+- difference between Announcements, Intl Dept. Requests, and Lounge Board
+- role permissions
+- new database models/tables
+- new routes/pages
+- testing steps
+
+Remove:
+- Common Group Chat as planned feature
+- Group Chat Coming Soon references
+- any statement saying Group Chat is the only placeholder left
+
+Update feature summary:
+The app now includes:
+- Substitute Food Locker
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+- Shared Item Borrowing
+- Lounge Cleaning
+- Lounge Board
+
+==================================================
+9. TESTING
+==================================================
+
+After implementation, provide clear testing steps.
+
+Test:
+1. Login as student
+2. Open Lounge Board from sidebar
+3. Create a post
+4. Another student comments on the post
+5. User reacts to post
+6. User edits/deletes own post
+7. User edits/deletes own comment
+8. Admin pins a post
+9. Admin locks a post
+10. Locked post blocks normal student comments
+11. Admin deletes inappropriate post/comment
+12. Group Chat no longer appears in sidebar or docs
+13. Announcements still work
+14. Intl Dept. Requests still work
+15. Borrowing still works
+16. Lounge Cleaning still works
+17. Useful Resources still works
+18. Substitute Food Locker visibility rules still work
+
+==================================================
+10. AFTER FINISHING
+==================================================
+
+After finishing, summarize:
+1. files changed
+2. schema/database changes
+3. new routes/pages
+4. sidebar changes
+5. removed Group Chat references
+6. how to test Lounge Board
+7. any limitations or things still needing manual testing

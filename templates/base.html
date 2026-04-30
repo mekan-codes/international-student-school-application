@@ -74,6 +74,10 @@
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
           <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
+        <a href="{{ url_for('lounge_board.index') }}"
+           class="{% if request.blueprint == 'lounge_board' %}active{% endif %}">
+          <i class="bi bi-chat-square-text"></i> Lounge Board
+        </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
@@ -83,11 +87,6 @@
         <a href="{{ url_for('cleaning.index') }}"
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Lounge Cleaning
-        </a>
-
-        <div class="nav-section">Coming Soon</div>
-        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
         </a>
       </nav>
     {% else %}
@@ -111,6 +110,10 @@
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
           <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
+        <a href="{{ url_for('lounge_board.index') }}"
+           class="{% if request.blueprint == 'lounge_board' %}active{% endif %}">
+          <i class="bi bi-chat-square-text"></i> Lounge Board
+        </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
@@ -127,11 +130,6 @@
             <i class="bi bi-archive"></i> Substitute Food Locker
           </a>
         {% endif %}
-
-        <div class="nav-section">Coming Soon</div>
-        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
-        </a>
       </nav>
     {% endif %}
 

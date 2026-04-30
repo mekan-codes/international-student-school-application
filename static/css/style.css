@@ -616,3 +616,78 @@ a { text-decoration: none; }
   border-color: #c7d2fe !important;
   color: var(--primary-dark) !important;
 }
+
+/* =============================================================
+   V4: Lounge Board (community posts)
+   ============================================================= */
+.lounge-post-card {
+  border-left: 3px solid transparent;
+  transition: box-shadow 0.12s, border-color 0.12s, transform 0.12s;
+}
+.lounge-post-card:hover {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.lounge-post-pinned {
+  border-left-color: #f59e0b;
+  background: #fffdf6;
+}
+.lounge-post-locked {
+  border-left-color: #94a3b8;
+  background: #f9fafb;
+}
+.lounge-post-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.lounge-post-title {
+  color: var(--text);
+  text-decoration: none;
+}
+.lounge-post-title:hover { color: var(--primary); }
+.lounge-post-preview {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  margin-bottom: 0;
+}
+.lounge-post-body {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* "comment count" pill — looks like a reaction button but isn't clickable
+   (the whole post title is the link to the detail page). */
+.reaction-btn-link {
+  cursor: default;
+  background: var(--surface);
+}
+.reaction-btn-link:hover { background: var(--surface); border-color: var(--border); }
+
+/* Comment list inside the post detail page */
+.lounge-comment-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lounge-comment-item {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfbfd;
+}
+.lounge-comment-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.lounge-comment-body {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
+}

@@ -23,6 +23,7 @@ models.py         User, FoodItem, ... + V2: Announcement,
                         CleaningTeam, CleaningTeamMember,
                         CleaningSession, CleaningTask
                   + V3.1: AnnouncementRecipient (targeted DMs)
+                  + V4: LoungePost, LoungeComment, LoungeReaction
 auth.py           login (by email or student_id) / register / logout
 admin.py          admin & manager blueprint (mounted at /admin)
 student.py        student blueprint (general dashboard + food page)
@@ -40,14 +41,20 @@ cleaning.py       V3 — cleaning teams + sessions + subtask checklist
                   team-detail page with phone-privacy aware members
 resources.py      V3.1 — Resources page (curated external links;
                   visible to all signed-in users)
+lounge_board.py   V4 — community feed: posts + comments + reactions,
+                  with admin/manager pin/lock/delete moderation.
+                  Replaces former Group Chat coming-soon stub.
 seed.py           demo data
 templates/        Jinja templates (announcements/, requests/,
                   borrowing/, cleaning/, plus V3.1 resources.html
-                  and cleaning/_team_members.html)
+                  and cleaning/_team_members.html, plus V4
+                  lounge_board/{list,detail,form}.html)
 static/css/       stylesheet (V3 adds task-list, member-pill,
                   borrow-item-card, cleaning-session-card classes;
                   V3.1 adds .resource-card / .resource-icon /
-                  .team-badge-link)
+                  .team-badge-link;
+                  V4 adds .lounge-post-card / .lounge-post-pinned /
+                  .lounge-post-locked / .lounge-comment-item)
 docs/             project spec
 ```
 

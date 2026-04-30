@@ -1,9 +1,10 @@
 # International Lounge
 
 A web app to centralize daily-life systems for international students.
-**Version 3** adds a **Borrowing system** for shared physical items and
-**Cleaning Teams + Sessions** with subtask checklists, on top of the
-V2 announcements/requests modules and the V1 substitute-food module.
+**Version 4** adds a **Lounge Board** — a community feed of posts,
+comments and reactions — and removes the old Group Chat placeholder.
+This sits on top of the V3 borrowing + cleaning modules, the V2
+announcements/requests modules, and the V1 substitute-food module.
 
 ---
 
@@ -11,10 +12,12 @@ V2 announcements/requests modules and the V1 substitute-food module.
 
 International students rely on shared programs (substitute food, cleaning
 rotations, borrowed equipment, announcements) that today are tracked in
-spreadsheets and group chats. The International Lounge gradually replaces
-those spreadsheets with a single, role-based dashboard.
+spreadsheets, ad-hoc chat groups and hallway notes. The International
+Lounge gradually replaces those spreadsheets with a single, role-based
+dashboard, and offers a built-in **Lounge Board** for community
+conversation in place of external chat groups.
 
-## Version 3 scope (with V3.1 polish)
+## Version 4 scope
 
 Implemented modules:
 - **Substitute food management** (V1, unchanged).
@@ -36,8 +39,13 @@ Implemented modules:
 - **Resources page** (V3.1) — a single page of curated external
   links available to every signed-in user, reachable from the
   sidebar.
+- **Lounge Board** (V4) — a community feed where every signed-in
+  user can publish posts, comment, and react with 👍 ❤️ 👀.
+  Admin and manager users can additionally **pin**, **lock**, or
+  delete any post or comment. Replaces the previous *Group Chat*
+  coming-soon placeholder.
 
-Common Group Chat remains the only "Coming soon" placeholder.
+There are no remaining "Coming soon" placeholders.
 
 ### V3 module: Borrowing
 
@@ -122,6 +130,34 @@ Common Group Chat remains the only "Coming soon" placeholder.
 > support tickets to the International Department. *Borrowing* (V3)
 > manages physical items checked out from the lounge.
 
+### V4 module: Lounge Board
+
+A community feed for everyone signed in — students and staff alike —
+that replaces the old *Group Chat* coming-soon placeholder.
+
+- **Posts** at `/lounge-board/`. Every signed-in user can publish a
+  post with a title, a category (General, Questions, Lost & Found,
+  Events, Food, Dormitory, Other) and free-form body text. The feed
+  paginates 10 posts per page; pinned posts always appear first, then
+  newest-first by creation time.
+- **Filters** — a single search box matches in title or body, and a
+  category dropdown narrows the feed. Both filters survive pagination.
+- **Comments** — every post has a comment thread shown on the detail
+  page. Comments are author-editable and author-deletable just like
+  posts.
+- **Reactions** — three emoji reactions (👍 ❤️ 👀) with a per-user
+  toggle/swap rule: each user can hold at most one reaction per post.
+  Tapping the same emoji again removes it; tapping a different one
+  swaps the reaction. A `UNIQUE(post_id, user_id)` constraint enforces
+  this at the database level.
+- **Moderation** — admins and managers can additionally **pin**,
+  **lock**, or delete any post or comment. Locked posts visually lock
+  down the comment form for normal students (staff can still post a
+  comment to the locked thread, e.g. an "official close" note).
+- **History snapshots** — every post and comment stores an
+  `author_name` snapshot at write time (same pattern as Announcements
+  and Requests) so renames or account deletions don't rewrite history.
+
 ## Version 1 scope (still active)
 
 The **substitute food management module** is unchanged from V1.
@@ -180,8 +216,8 @@ The **substitute food management module** is unchanged from V1.
   email, phone number (if added), plus profile-edit and password-change
   forms.
 
-### Planned future features (placeholders shown in the sidebar)
-- Common Group Chat
+### Planned future features
+- _None — V4 ships the Lounge Board and removes the last placeholder._
 
 ## User roles
 
@@ -252,9 +288,9 @@ The **substitute food management module** is unchanged from V1.
   title) is called **Homepage** for both staff and students — the route
   paths (`/admin/` and `/student/`) are unchanged so internal references
   still work.
-- **Future modules.** Of the original "Coming soon" set, only
-  Common Group Chat remains a placeholder — Announcements, Requests,
-  Borrowing, and Cleaning are now implemented.
+- **Future modules.** All originally planned modules are implemented:
+  Announcements, Requests, Borrowing, Cleaning, Resources, and the new
+  V4 Lounge Board (replacing the Group Chat placeholder).
 
 ## Demo accounts (seeded automatically)
 
@@ -390,9 +426,11 @@ Use the seeded accounts:
      logs.
 
 3. **Sub-food student** (`student1@school.com` / `student123`)
-   - Sidebar shows *Homepage*, *Lounge Locker*, and the coming-soon
-     items — no "My Profile" item. The user chip at the bottom is the
-     way into *Settings*. No role label appears anywhere.
+   - Sidebar shows *Homepage*, the **Communication** section
+     (Announcements, Requests, Resources, **Lounge Board**), the
+     **Lounge Life** section (Borrowing, Cleaning, Lounge Locker) — no
+     "My Profile" item. The user chip at the bottom is the way into
+     *Settings*. No role label appears anywhere.
    - *Lounge Locker* lists items in stock with calories per serving and
      serving size when set, or "Calories not listed" otherwise. There
      is no internal "membership" wording on the page.
@@ -401,15 +439,16 @@ Use the seeded accounts:
      toast disappears on its own after a few seconds.
 
 4. **Standard student** (`student2@school.com` / `student123`)
-   - Sidebar shows *Homepage*, the V2 **Communication** section
-     (Announcements, Requests), and the remaining coming-soon items —
-     no food link, no "My Profile" link. The user chip at the bottom
-     is the entry to *Settings*.
+   - Sidebar shows *Homepage*, the **Communication** section
+     (Announcements, Requests, Resources, **Lounge Board**) and the
+     **Lounge Life** section (Borrowing, Cleaning) — no food link, no
+     "My Profile" link. The user chip at the bottom is the entry to
+     *Settings*.
    - Direct visit to `/student/food` silently redirects back to the
      dashboard.
    - Dashboard never mentions roles, programs, membership, or limits;
      it shows the welcome card, the **Recent announcements** widget,
-     and the upcoming-features list.
+     and quick-link tiles for the Lounge Board and Resources.
 
 You can also log any student in by their student ID — e.g.
 `S002` / `student123`.
