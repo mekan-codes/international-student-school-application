@@ -8,7 +8,7 @@ from functools import wraps
 from flask import Blueprint, render_template, redirect, url_for, abort, flash
 from flask_login import login_required, current_user
 
-from models import FoodItem
+from models import FoodItem, Announcement
 
 student_bp = Blueprint("student", __name__)
 
@@ -40,9 +40,12 @@ def member_required(view):
 def dashboard():
     if current_user.is_staff:
         return redirect(url_for("admin.dashboard"))
-    # Members see info that points them to the food page; non-members see a
-    # neutral general dashboard with no mention of substitute food.
-    return render_template("student/dashboard.html")
+    # Latest 3 announcements visible to this student. The visibility filter
+    # runs in SQL — students never load unpublished or off-audience rows.
+    recent_announcements = (Announcement.visible_to(current_user)
+                            .limit(3).all())
+    return render_template("student/dashboard.html",
+                           recent_announcements=recent_announcements)
 
 
 @student_bp.route("/food")

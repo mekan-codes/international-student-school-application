@@ -12,6 +12,8 @@ from auth import auth_bp
 from admin import admin_bp
 from student import student_bp
 from profile import profile_bp
+from announcements import announcements_bp
+from requests_bp import requests_bp
 from seed import seed_database
 
 
@@ -91,6 +93,8 @@ def create_app():
     app.register_blueprint(admin_bp, url_prefix="/admin")
     app.register_blueprint(student_bp, url_prefix="/student")
     app.register_blueprint(profile_bp)
+    app.register_blueprint(announcements_bp, url_prefix="/announcements")
+    app.register_blueprint(requests_bp, url_prefix="/requests")
 
     # ----- Root route: redirect based on role -----
     @app.route("/")
@@ -102,13 +106,15 @@ def create_app():
         return redirect(url_for("student.dashboard"))
 
     # ----- Future-module placeholders (Coming soon) -----
+    # NOTE: `announcements` and `requests` graduated to real modules in V2,
+    # so they're no longer listed here. Their old `/coming-soon/...` URLs
+    # still resolve to the generic "Coming soon" screen for backward compat,
+    # but the sidebar links to the real pages now.
     @app.route("/coming-soon/<module>")
     @login_required
     def coming_soon(module):
         modules = {
             "borrowing": "Borrowing",
-            "requests": "Requests to International Department",
-            "announcements": "Announcements",
             "chat": "Common Group Chat",
             "cleaning": "Cleaning Sessions",
         }

@@ -26,7 +26,10 @@ from flask import (
 from flask_login import login_required, current_user
 from sqlalchemy import func
 
-from models import db, User, FoodItem, InventoryLog, Distribution, DistributionItem
+from models import (
+    db, User, FoodItem, InventoryLog, Distribution, DistributionItem,
+    Announcement, SupportRequest,
+)
 
 admin_bp = Blueprint("admin", __name__)
 
@@ -147,6 +150,16 @@ def dashboard():
                        .order_by(FoodItem.name)
                        .all())
 
+    # V2: 3 most recent announcements (any state) and a count of open
+    # requests, both via DB-side limit/count — no Python-side filtering.
+    recent_announcements = (Announcement.query
+                            .order_by(Announcement.created_at.desc())
+                            .limit(3).all())
+    open_requests_count = (SupportRequest.query
+                           .filter(SupportRequest.status.in_(
+                               ["submitted", "in_review"]))
+                           .count())
+
     return render_template(
         "admin/dashboard.html",
         total_students=total_students,
@@ -155,6 +168,8 @@ def dashboard():
         total_warehouse=total_warehouse,
         total_locker=total_locker,
         low_stock_items=low_stock_items,
+        recent_announcements=recent_announcements,
+        open_requests_count=open_requests_count,
     )
 
 

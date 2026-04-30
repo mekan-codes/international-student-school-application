@@ -143,3 +143,186 @@ class DistributionItem(db.Model):
     quantity = db.Column(db.Integer, nullable=False)
     locker_qty_after = db.Column(db.Integer, nullable=True)
     warehouse_qty_after = db.Column(db.Integer, nullable=True)
+
+
+# =========================================================================== #
+# Version 2: Announcements                                                    #
+# =========================================================================== #
+class Announcement(db.Model):
+    """Official lounge announcement posted by staff.
+
+    Visibility is filtered at the database level (see `visible_to`) so we
+    never load rows the current user shouldn't see — same idea as picking
+    the right index/key set for a query in a data structures course.
+    """
+    __tablename__ = "announcements"
+
+    PRIORITIES = ("normal", "important", "urgent")
+    AUDIENCES = ("everyone", "all_students", "sub_food_students", "staff_only")
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+
+    author_user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # Snapshot of the author's name at post time (so renaming a user later
+    # doesn't rewrite history).
+    author_name = db.Column(db.String(120), nullable=False)
+
+    priority = db.Column(db.String(20), nullable=False, default="normal")
+    target_audience = db.Column(db.String(30), nullable=False, default="everyone")
+    is_published = db.Column(db.Boolean, nullable=False, default=False)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    reactions = db.relationship(
+        "AnnouncementReaction",
+        backref="announcement",
+        cascade="all, delete-orphan",
+    )
+
+    # ----- Visibility helper (DB-side filter) -----
+    @classmethod
+    def visible_to(cls, user):
+        """Return a query of announcements the given user is allowed to see.
+
+        - Students never see unpublished announcements.
+        - Audience filter is applied in SQL — never in Python — so large
+          announcement tables stay efficient.
+        """
+        q = cls.query
+        if user is None or not user.is_authenticated:
+            return q.filter(db.false())
+
+        if user.is_staff:
+            # Staff see everything (published or not, all audiences).
+            return q.order_by(cls.created_at.desc())
+
+        # Students: only published, and only audiences they belong to.
+        allowed = ["everyone", "all_students"]
+        if user.is_sub_food_member:
+            allowed.append("sub_food_students")
+        return (q.filter_by(is_published=True)
+                 .filter(cls.target_audience.in_(allowed))
+                 .order_by(cls.created_at.desc()))
+
+    # ----- Display helpers (used by templates) -----
+    @property
+    def priority_label(self) -> str:
+        return {"normal": "Normal", "important": "Important",
+                "urgent": "Urgent"}.get(self.priority, self.priority.title())
+
+    @property
+    def priority_badge_class(self) -> str:
+        return {
+            "normal": "bg-secondary",
+            "important": "bg-info text-dark",
+            "urgent": "bg-danger",
+        }.get(self.priority, "bg-secondary")
+
+    @property
+    def audience_label(self) -> str:
+        return {
+            "everyone": "Everyone",
+            "all_students": "All students",
+            "sub_food_students": "Sub-food students",
+            "staff_only": "Staff only",
+        }.get(self.target_audience, self.target_audience)
+
+    def reaction_counts(self) -> dict:
+        """{emoji: count} dict — O(n) over this announcement's reactions."""
+        # Dict (hash map) → O(1) lookup per emoji while counting.
+        counts = {e: 0 for e in AnnouncementReaction.EMOJIS}
+        for r in self.reactions:
+            counts[r.emoji] = counts.get(r.emoji, 0) + 1
+        return counts
+
+    def reaction_for(self, user) -> str | None:
+        """Which emoji the given user picked, or None."""
+        if user is None or not user.is_authenticated:
+            return None
+        for r in self.reactions:
+            if r.user_id == user.id:
+                return r.emoji
+        return None
+
+
+class AnnouncementReaction(db.Model):
+    """Single reaction on an announcement. One per (user, announcement)."""
+    __tablename__ = "announcement_reactions"
+
+    EMOJIS = ("👍", "❤️", "✅", "👀")
+
+    id = db.Column(db.Integer, primary_key=True)
+    announcement_id = db.Column(
+        db.Integer, db.ForeignKey("announcements.id"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    emoji = db.Column(db.String(8), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("announcement_id", "user_id",
+                            name="uq_user_announcement_reaction"),
+    )
+
+
+# =========================================================================== #
+# Version 2: Requests to International Department (support tickets)           #
+# =========================================================================== #
+class SupportRequest(db.Model):
+    """A student-submitted question/request handled by admins or managers.
+
+    This is intentionally a SUPPORT TICKET, not a borrowing record — the
+    physical-item borrowing module remains a future feature.
+    """
+    __tablename__ = "support_requests"
+
+    CATEGORIES = ("Food", "Dormitory", "Documents", "School life",
+                  "Health", "Other")
+    STATUSES = ("submitted", "in_review", "resolved", "rejected")
+
+    id = db.Column(db.Integer, primary_key=True)
+    student_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False)
+    student_name = db.Column(db.String(120), nullable=False)
+
+    category = db.Column(db.String(40), nullable=False)
+    title = db.Column(db.String(160), nullable=False)
+    description = db.Column(db.Text, nullable=False)
+
+    status = db.Column(db.String(20), nullable=False, default="submitted")
+
+    admin_response = db.Column(db.Text, nullable=True)
+    handled_by_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=True)
+    handled_by_name = db.Column(db.String(120), nullable=True)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    # ----- Display helpers (used by templates) -----
+    @property
+    def status_label(self) -> str:
+        return {"submitted": "Submitted", "in_review": "In review",
+                "resolved": "Resolved",
+                "rejected": "Rejected"}.get(self.status, self.status.title())
+
+    @property
+    def status_badge_class(self) -> str:
+        return {
+            "submitted": "bg-secondary",
+            "in_review": "bg-info text-dark",
+            "resolved": "bg-success",
+            "rejected": "bg-danger",
+        }.get(self.status, "bg-secondary")
+
+    @property
+    def has_response(self) -> bool:
+        return bool(self.admin_response and self.admin_response.strip())

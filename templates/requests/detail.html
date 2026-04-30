@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Request #{{ r.id }}{% endblock %}
+
+{% block content %}
+<div class="mb-3">
+  <a href="{{ url_for('requests.list_view') }}" class="text-decoration-none">
+    <i class="bi bi-arrow-left"></i>
+    {% if current_user.is_staff %}Back to all requests{% else %}Back to my requests{% endif %}
+  </a>
+</div>
+
+<article class="card request-card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h5 class="mb-1">{{ r.title }}</h5>
+        <div class="text-muted small">
+          <i class="bi bi-person"></i> {{ r.student_name }}
+          <span class="mx-1">·</span>
+          <span class="badge bg-light text-dark border">{{ r.category }}</span>
+          <span class="mx-1">·</span>
+          <i class="bi bi-clock"></i>
+          <time datetime="{{ r.created_at.isoformat() }}">
+            {{ r.created_at.strftime('%b %d, %Y · %H:%M') }} UTC
+          </time>
+        </div>
+      </div>
+      <span class="badge {{ r.status_badge_class }}">{{ r.status_label }}</span>
+    </div>
+
+    <hr>
+    <div style="white-space:pre-wrap;">{{ r.description }}</div>
+  </div>
+</article>
+
+{# ---- Response (visible to everyone with access) ---- #}
+<div class="card mb-3">
+  <div class="card-header">
+    <strong><i class="bi bi-reply"></i> Response</strong>
+    {% if r.handled_by_name %}
+      <span class="text-muted small ms-2">
+        Last touched by {{ r.handled_by_name }}
+        on {{ r.updated_at.strftime('%b %d, %Y · %H:%M') }} UTC
+      </span>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    {% if current_user.is_staff %}
+      <form method="post" action="{{ url_for('requests.respond', req_id=r.id) }}">
+        <textarea class="form-control" name="admin_response" rows="5"
+                  placeholder="Write your response to the student…">{{ r.admin_response or '' }}</textarea>
+        <div class="mt-2">
+          <button class="btn btn-primary" type="submit">
+            <i class="bi bi-send"></i> Save response
+          </button>
+        </div>
+      </form>
+    {% else %}
+      {% if r.has_response %}
+        <div style="white-space:pre-wrap;">{{ r.admin_response }}</div>
+      {% else %}
+        <p class="text-muted mb-0">
+          No response yet. You'll see one here once a staff member replies.
+        </p>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{# ---- Status + delete (staff only) ---- #}
+{% if current_user.is_staff %}
+  <div class="card">
+    <div class="card-body">
+      <div class="d-flex flex-wrap gap-3 align-items-center">
+        <form method="post" action="{{ url_for('requests.update_status', req_id=r.id) }}"
+              class="d-flex gap-2 align-items-center">
+          <label class="form-label mb-0"><strong>Status</strong></label>
+          <select class="form-select form-select-sm" name="status" style="width:auto;">
+            {% for s in statuses %}
+              <option value="{{ s }}" {% if r.status == s %}selected{% endif %}>
+                {{ s.replace('_',' ').title() }}
+              </option>
+            {% endfor %}
+          </select>
+          <button class="btn btn-sm btn-primary" type="submit">Update</button>
+        </form>
+
+        <form method="post" action="{{ url_for('requests.delete', req_id=r.id) }}"
+              class="ms-auto"
+              onsubmit="return confirm('Delete this request? This cannot be undone.');">
+          <button class="btn btn-sm btn-outline-danger" type="submit">
+            <i class="bi bi-trash"></i> Delete request
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

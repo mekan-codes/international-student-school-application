@@ -29,15 +29,45 @@
   {% endif %}
 
   <div class="col-md-6">
-    <a class="info-tile-link" href="{{ url_for('profile.settings') }}">
+    <a class="info-tile-link" href="{{ url_for('requests.list_view') }}">
       <div class="info-tile">
-        <i class="bi bi-gear"></i>
+        <i class="bi bi-envelope-paper"></i>
         <div>
-          <strong>Settings</strong>
-          <p>Update your name, email, phone number, or password.</p>
+          <strong>Requests</strong>
+          <p>Send a question or request to the International Department.</p>
         </div>
       </div>
     </a>
+  </div>
+</div>
+
+{# ---- V2: Recent announcements widget ---- #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong><i class="bi bi-megaphone"></i> Recent announcements</strong>
+    <a class="btn btn-sm btn-outline-primary"
+       href="{{ url_for('announcements.list_view') }}">View all</a>
+  </div>
+  <div class="card-body">
+    {% if not recent_announcements %}
+      <p class="text-muted mb-0">No announcements yet. Check back soon.</p>
+    {% else %}
+      {% for a in recent_announcements %}
+        <a class="recent-ann-item"
+           href="{{ url_for('announcements.list_view') }}#a-{{ a.id }}">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <div class="recent-ann-title">{{ a.title }}</div>
+              <div class="recent-ann-meta">
+                {{ a.author_name }} ·
+                {{ a.created_at.strftime('%b %d, %Y · %H:%M') }} UTC
+              </div>
+            </div>
+            <span class="badge {{ a.priority_badge_class }}">{{ a.priority_label }}</span>
+          </div>
+        </a>
+      {% endfor %}
+    {% endif %}
   </div>
 </div>
 
@@ -50,8 +80,6 @@
     </p>
     <ul class="upcoming-list mb-0">
       <li><i class="bi bi-bag"></i> Borrowing system</li>
-      <li><i class="bi bi-envelope-paper"></i> Requests to International Department</li>
-      <li><i class="bi bi-megaphone"></i> Announcements</li>
       <li><i class="bi bi-chat-dots"></i> Common Group Chat</li>
       <li><i class="bi bi-droplet"></i> Cleaning Sessions</li>
     </ul>

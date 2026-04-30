@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% block title %}
+  {% if announcement %}Edit announcement{% else %}New announcement{% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <strong>
+      {% if announcement %}
+        <i class="bi bi-pencil"></i> Edit announcement
+      {% else %}
+        <i class="bi bi-megaphone"></i> New announcement
+      {% endif %}
+    </strong>
+  </div>
+  <div class="card-body">
+    <form method="post">
+      <div class="mb-3">
+        <label class="form-label">Title</label>
+        <input class="form-control" name="title" required maxlength="160"
+               value="{{ announcement.title if announcement else '' }}">
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Content</label>
+        <textarea class="form-control" name="content" rows="6" required>{{ announcement.content if announcement else '' }}</textarea>
+        <div class="form-text">Plain text — line breaks are preserved.</div>
+      </div>
+
+      <div class="row">
+        <div class="col-md-4 mb-3">
+          <label class="form-label">Priority</label>
+          <select class="form-select" name="priority">
+            {% for p in priorities %}
+              <option value="{{ p }}"
+                {% if announcement and announcement.priority == p
+                      or not announcement and p == 'normal' %}selected{% endif %}>
+                {{ p|capitalize }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-5 mb-3">
+          <label class="form-label">Target audience</label>
+          <select class="form-select" name="target_audience">
+            {% set labels = {
+              'everyone': 'Everyone',
+              'all_students': 'All students',
+              'sub_food_students': 'Sub-food students only',
+              'staff_only': 'Staff only',
+            } %}
+            {% for a in audiences %}
+              <option value="{{ a }}"
+                {% if announcement and announcement.target_audience == a
+                      or not announcement and a == 'everyone' %}selected{% endif %}>
+                {{ labels[a] }}
+              </option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-3 mb-3">
+          <label class="form-label d-block">Visibility</label>
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox"
+                   id="is_published" name="is_published"
+                   {% if announcement and announcement.is_published %}checked{% endif %}>
+            <label class="form-check-label" for="is_published">
+              Publish now
+            </label>
+          </div>
+          <div class="form-text">Drafts are only visible to staff.</div>
+        </div>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-check-lg"></i>
+          {% if announcement %}Save changes{% else %}Create announcement{% endif %}
+        </button>
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('announcements.list_view') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

@@ -323,9 +323,107 @@ a "Coming soon" page.
 | Module                        | New routes               |
 |-------------------------------|--------------------------|
 | Borrowing system              | `/borrowing/...`         |
-| Requests to International Dept| `/requests/...`          |
-| Announcements                 | `/announcements/...`     |
 | Common Group Chat             | `/chat/...`              |
 | Cleaning Sessions             | `/cleaning/...`          |
 
 Each module follows the same blueprint pattern as the food module.
+
+---
+
+## 11. Version 2 features (implemented)
+
+V2 ships two new modules on top of V1: **Announcements** and **Requests
+to the International Department**.
+
+### 11.1 Permission matrix
+
+| Feature                                       | Admin | Manager | Sub-food Student | Std. Student |
+|-----------------------------------------------|:-----:|:-------:|:----------------:|:------------:|
+| View announcement feed (audience-filtered)    |   ✅   |    ✅   |        ✅         |       ✅      |
+| Create / edit / delete announcement           |   ✅   |    ✅   |        —         |       —      |
+| Toggle Draft ↔ Published                       |   ✅   |    ✅   |        —         |       —      |
+| React to announcement (👍 ❤️ ✅ 👀)            |   ✅   |    ✅   |        ✅         |       ✅      |
+| Submit a request                              |   —   |    —   |        ✅         |       ✅      |
+| View own requests                             |   —   |    —   |        ✅         |       ✅      |
+| View *all* requests, filter, search           |   ✅   |    ✅   |        —         |       —      |
+| Respond to a request                          |   ✅   |    ✅   |        —         |       —      |
+| Change request status                         |   ✅   |    ✅   |        —         |       —      |
+| Delete a request                              |   ✅   |    ✅   |        —         |       —      |
+
+### 11.2 Data model (additions)
+
+Three new tables are auto-created via `db.create_all()` on first start —
+no schema migration is required for fresh databases.
+
+- **`announcements`** — `id`, `title`, `content`, `priority`
+  (`normal`/`important`/`urgent`), `target_audience` (`everyone`/
+  `all_students`/`sub_food_students`/`staff_only`), `is_published`,
+  `created_at`, `updated_at`, `author_id` → `users.id`.
+- **`announcement_reactions`** — `id`, `announcement_id`, `user_id`,
+  `emoji` (one of 👍 ❤️ ✅ 👀), `created_at`. Unique constraint on
+  `(announcement_id, user_id)` enforces one reaction per user per post
+  (clicking the same emoji removes; clicking another swaps).
+- **`support_requests`** — `id`, `student_id` → `users.id`, `category`
+  (Food/Dormitory/Documents/School life/Health/Other), `title`,
+  `description`, `status` (`submitted`/`in_review`/`resolved`/
+  `rejected`), `admin_response`, `responded_by_id` → `users.id`,
+  `responded_at`, `created_at`, `updated_at`.
+
+### 11.3 Routes
+
+**Announcements** (blueprint `announcements`, mount `/announcements`):
+
+| Method | Path                  | Who    | Purpose                              |
+|-------:|-----------------------|--------|--------------------------------------|
+| GET    | `/`                   | All    | Staff list / student feed (by role)  |
+| GET/POST | `/new`              | Staff  | Create announcement                  |
+| GET/POST | `/<id>/edit`        | Staff  | Edit                                 |
+| POST   | `/<id>/delete`        | Staff  | Delete                               |
+| POST   | `/<id>/publish`       | Staff  | Toggle Draft ↔ Published              |
+| POST   | `/<id>/react`         | All    | Add / swap / remove reaction         |
+
+**Requests** (blueprint `requests`, file `requests_bp.py`, mount
+`/requests`):
+
+| Method | Path                  | Who      | Purpose                            |
+|-------:|-----------------------|----------|------------------------------------|
+| GET    | `/`                   | All      | Staff filtered list / own requests |
+| GET/POST | `/new`              | Student  | Submit a request                   |
+| GET    | `/<id>`               | Owner/Staff | Detail page                     |
+| POST   | `/<id>/respond`       | Staff    | Add / update admin response        |
+| POST   | `/<id>/status`        | Staff    | Change status                      |
+| POST   | `/<id>/delete`        | Staff    | Delete                             |
+
+### 11.4 Audience filter (SQL-side)
+
+`Announcement.visible_to(user)` returns a SQLAlchemy query already
+filtered to `is_published == True` and a `target_audience` `IN (...)`
+list computed from the user's role and `is_sub_food_member` flag. The
+student feed and the dashboard widget both call this — students never
+load rows they aren't allowed to see.
+
+### 11.5 Requests vs. Borrowing
+
+These are *different* modules:
+
+- **Requests** (V2, implemented) — free-form support tickets sent to
+  the International Department (broken heater, lost ID card, transcript
+  question, etc.).
+- **Borrowing** (still "Coming soon") — checkout/return tracking for
+  physical items kept at the lounge (umbrellas, adapters, tools, …).
+
+### 11.6 Dashboard surfacing
+
+- **Admin dashboard** — adds a *Recent announcements* card (3 most
+  recent, with priority + Draft/Published badges, plus a "New" button)
+  and an *Open requests* counter linking to the staff triage list.
+- **Student dashboard** — adds a *Recent announcements* widget (3 most
+  recent, audience-filtered) and removes Announcements / Requests from
+  the "What's coming next" upcoming-features list.
+
+### 11.7 Naming caveat
+
+The requests blueprint is registered under the name `"requests"` so
+`url_for("requests.list_view")` works from anywhere. The implementation
+file is named **`requests_bp.py`** to avoid shadowing the popular
+`requests` PyPI library if it is ever installed for HTTP work.
