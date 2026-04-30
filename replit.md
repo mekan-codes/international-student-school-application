@@ -7,7 +7,8 @@
 - **UI**: Bootstrap 5 + Bootstrap Icons + custom `static/css/style.css`
 
 ## How it runs
-- Workflow `Start application` → `python app.py`
+- Workflow `Start application` → `gunicorn --bind 0.0.0.0:5000 --reuse-port --reload app:app`
+- Production deploy → `gunicorn --bind=0.0.0.0:5000 --reuse-port app:app`
 - Listens on host `0.0.0.0`, port `5000` (Replit webview)
 - DB is created and seeded on first start (see `seed.py`)
 - Additive schema migration (`app._migrate_schema`) runs on every start so
