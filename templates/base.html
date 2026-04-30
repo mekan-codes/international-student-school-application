@@ -88,6 +88,14 @@
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Lounge Cleaning
         </a>
+        {# Managers may opt in to the substitute-food program. When they
+           do, surface the same locker link the sub-food students get. #}
+        {% if current_user.is_manager and current_user.is_sub_food_member %}
+          <a href="{{ url_for('student.food') }}"
+             class="{% if request.endpoint == 'student.food' %}active{% endif %}">
+            <i class="bi bi-archive"></i> Substitute Food Locker
+          </a>
+        {% endif %}
       </nav>
     {% else %}
       {# ---- Student nav. Food links only for sub-food members. ---- #}
@@ -182,12 +190,21 @@
 {% else %}
   {# Auth pages have their own simple layout #}
   <div class="auth-shell">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, msg in messages %}
-        <div class="alert alert-{{ category }}">{{ msg }}</div>
-      {% endfor %}
-    {% endwith %}
-    {% block auth_content %}{% endblock %}
+    <div class="auth-stack">
+      {# Flash messages live INSIDE the centered auth column so they
+         line up with the login card instead of floating off to the
+         left as flex siblings. #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show js-auto-dismiss auth-alert"
+               data-category="{{ category }}" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      {% block auth_content %}{% endblock %}
+    </div>
   </div>
 {% endif %}
 

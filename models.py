@@ -336,8 +336,11 @@ class SupportRequest(db.Model):
     """
     __tablename__ = "support_requests"
 
-    CATEGORIES = ("Food", "Dormitory", "Documents", "School life",
-                  "Health", "Other")
+    # Display order matters — students see the dropdown in this order.
+    # "International Lounge" is for issues with the lounge itself
+    # (broken equipment, lost items found in the lounge, suggestions).
+    CATEGORIES = ("Food", "International Lounge", "Dormitory", "Documents",
+                  "School life", "Health", "Other")
     STATUSES = ("submitted", "in_review", "resolved", "rejected")
 
     id = db.Column(db.Integer, primary_key=True)

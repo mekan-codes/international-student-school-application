@@ -1,0 +1,128 @@
+Apply final small fixes to the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify existing code only.
+- Preserve current UI style and all existing features.
+- Focus only on the listed fixes.
+- Do not add new major modules.
+
+==================================================
+1. Lounge Board: remove View button
+==================================================
+
+On the Lounge Board feed/list page, each post currently has a separate “View” button.
+
+Remove the View button.
+
+Users should open/view the post detail by:
+- clicking the comment icon / comment count
+- or clicking the post card/title if already supported
+
+Keep:
+- reaction buttons
+- comment count
+- edit/delete controls where appropriate
+- post detail page
+
+Make sure there is still an obvious way to open comments/details.
+
+==================================================
+2. Manager substitute food access
+==================================================
+
+Managers are often students too, so managers should be able to be part of the substitute food group.
+
+Fix:
+- Admin should be able to toggle substitute food access for managers if needed.
+- Managers should be allowed to have is_sub_food_member = true.
+- Managers with substitute food access should be able to see/use Substitute Food Locker, if this fits current role system safely.
+- Managers should still keep manager permissions.
+- Do not let managers self-promote/demote or bypass admin-only user controls.
+
+Important:
+This is about substitute food access only, not role elevation.
+
+==================================================
+3. Login page error message layout
+==================================================
+
+On the login page, the error/flash message is visually off to the side.
+
+Fix the auth page layout:
+- Error messages should appear inside or directly above the login card.
+- They should be aligned with the login form.
+- They should not float awkwardly on the left side.
+- Keep auto-dismiss behavior if already implemented.
+
+Also lightly improve landing/login page design:
+- keep International Lounge branding
+- keep demo accounts box
+- keep email/student ID login
+- make layout centered and clean
+- do not redesign the whole app too aggressively
+
+==================================================
+4. Intl Dept. Requests category
+==================================================
+
+Add one more request category:
+
+International Lounge
+
+Category order should be:
+- Food
+- International Lounge
+- Dormitory
+- Documents
+- School life
+- Health
+- Other
+
+Update:
+- student request form
+- admin/manager request filters
+- any category validation/constants
+- docs if categories are listed
+
+==================================================
+5. Lounge Board staff buttons clarity
+==================================================
+
+On Lounge Board post detail/admin view, staff see Pin and Lock buttons.
+
+These are useful, but make their purpose clearer and less confusing.
+
+Keep functionality:
+- Pin: keeps important post at top
+- Lock: prevents normal users from adding new comments
+
+Improve wording/tooltips:
+- Pin button tooltip/title: “Pin this post to the top”
+- Lock button tooltip/title: “Lock comments on this post”
+- If already pinned, button should say “Unpin”
+- If already locked, button should say “Unlock”
+- Make badges clear:
+  - Pinned
+  - Comments locked
+
+Do not remove Pin/Lock functionality, but make it more understandable.
+
+==================================================
+6. Quick regression check
+==================================================
+
+After changes, check:
+- student can open Lounge Board post/comments without View button
+- admin/manager can still pin/lock/unlock/unpin
+- manager with substitute food access can use Substitute Food Locker
+- standard student still cannot see Substitute Food Locker
+- login error message appears in the correct place
+- Intl Dept. Requests category includes International Lounge
+- existing Announcements, Requests, Borrowing, Cleaning, Resources still work
+
+After finishing, summarize:
+1. files changed
+2. what was fixed
+3. how to test each fix
+4. anything that needs manual checking

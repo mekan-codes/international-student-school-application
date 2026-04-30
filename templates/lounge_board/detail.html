@@ -40,8 +40,9 @@
           </span>
         {% endif %}
         {% if post.is_locked %}
-          <span class="badge bg-secondary">
-            <i class="bi bi-lock-fill"></i> Locked
+          <span class="badge bg-secondary"
+                title="Comments are locked for normal users">
+            <i class="bi bi-lock-fill"></i> Comments locked
           </span>
         {% endif %}
         <span class="badge {{ post.category_badge_class }}">{{ post.category }}</span>
@@ -68,10 +69,12 @@
             </button>
           </form>
         {% endfor %}
-        <span class="reaction-btn reaction-btn-link">
+        <a class="reaction-btn reaction-btn-open" href="#comments"
+           title="Jump to comments">
           <span class="reaction-emoji"><i class="bi bi-chat"></i></span>
           <span class="reaction-count">{{ post.comment_count }}</span>
-        </span>
+          <span class="reaction-open-label">Comments</span>
+        </a>
       </div>
 
       <div class="d-flex gap-2 flex-wrap">
@@ -85,17 +88,19 @@
           <form method="post"
                 action="{{ url_for('lounge_board.toggle_pin', post_id=post.id) }}"
                 class="d-inline">
-            <button class="btn btn-sm btn-outline-warning" type="submit">
+            <button class="btn btn-sm btn-outline-warning" type="submit"
+                    title="{% if post.is_pinned %}Unpin this post (it will no longer stay at the top){% else %}Pin this post to the top{% endif %}">
               <i class="bi bi-pin-angle"></i>
-              {{ "Unpin" if post.is_pinned else "Pin" }}
+              {{ "Unpin" if post.is_pinned else "Pin to top" }}
             </button>
           </form>
           <form method="post"
                 action="{{ url_for('lounge_board.toggle_lock', post_id=post.id) }}"
                 class="d-inline">
-            <button class="btn btn-sm btn-outline-secondary" type="submit">
+            <button class="btn btn-sm btn-outline-secondary" type="submit"
+                    title="{% if post.is_locked %}Unlock comments — normal users will be able to comment again{% else %}Lock comments on this post — only staff will be able to comment{% endif %}">
               <i class="bi bi-lock"></i>
-              {{ "Unlock" if post.is_locked else "Lock" }}
+              {{ "Unlock comments" if post.is_locked else "Lock comments" }}
             </button>
           </form>
         {% endif %}
@@ -115,7 +120,7 @@
 </article>
 
 {# ============== Comments ============== #}
-<div class="card mb-3">
+<div id="comments" class="card mb-3">
   <div class="card-header d-flex justify-content-between align-items-center">
     <strong>
       <i class="bi bi-chat-dots"></i>

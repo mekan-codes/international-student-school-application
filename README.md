@@ -212,6 +212,11 @@ The **substitute food management module** is unchanged from V1.
   size when set ("Calories not listed" otherwise).
 - **Standard (non-member) students** see only the general dashboard and
   profile — no food links anywhere in the sidebar.
+- **Managers may opt in to the substitute-food program too.** When an
+  admin marks a manager as a sub-food member, the *Substitute Food
+  Locker* link appears in the manager's sidebar (under "Lounge Life")
+  and the locker page becomes accessible alongside their normal staff
+  duties. Admins themselves cannot be sub-food members.
 - The student Settings page shows only the basics: name, student ID,
   email, phone number (if added), plus profile-edit and password-change
   forms.

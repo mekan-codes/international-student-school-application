@@ -70,9 +70,12 @@ You can sign in with the email or the student ID.
 ## Roles
 - **admin** — full access, can promote/demote/reset password.
 - **manager** — operational access (users, food, inventory, distributions,
-  logs); cannot touch admin/manager rows or reset passwords.
+  logs); cannot touch admin/manager rows or reset passwords. May also
+  opt in as a sub-food member (admin toggles the flag) to gain access
+  to the *Substitute Food Locker* page.
 - **student** — personal dashboard + profile. Food page only when
   `is_sub_food_member`.
+- **admins cannot** be marked as sub-food members.
 
 ## Conventions
 - Add new feature modules as **Flask blueprints** under their own file.
@@ -396,6 +399,28 @@ Routes smoke-tested while logged in (admin + S001):
 ### Settings phone input
 - Verbose helper text "Pick your country, then type your number..." replaced with a concise one-liner.
 - Country picker, formatting functionality, and privacy checkbox unchanged.
+
+## V4.1 — Small UX fixes (Apr 2026)
+
+1. **Lounge Board "View" button removed.** The redundant View button is
+   gone from the post list; the comment-count pill is now the
+   clickable affordance that opens the post (links to detail; on the
+   detail page it scrolls to `#comments`).
+2. **Managers can be sub-food members.** `member_required` accepts
+   non-admin sub-food members. Admins promoting a user no longer clear
+   the sub-food flag, and admins can toggle the sub-food flag for
+   managers. The *Substitute Food Locker* link appears in the staff
+   sidebar for managers who have the flag set.
+3. **Login flash layout fixed.** Auth pages now wrap flash messages
+   and the auth-card in an `.auth-stack` column so the alert lines up
+   above the card instead of floating off to the side.
+4. **Intl Dept. Requests gain "International Lounge" category.** Added
+   to `SupportRequest.CATEGORIES` between Food and Dormitory; templates
+   pick it up automatically.
+5. **Lounge Board pin/lock affordances clarified.** Buttons now have
+   descriptive `title=` tooltips ("Pin to top"/"Unpin", "Lock
+   comments"/"Unlock comments") and the locked badge reads
+   "Comments locked" so it's clear only commenting is restricted.
 
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a

@@ -92,13 +92,18 @@
             {% else %}
               <span class="badge bg-secondary">Student</span>
             {% endif %}
-            {# Sub-food badge (students only) #}
+            {# Sub-food badge — students always show it; managers only
+               show it when they are sub-food members (admins never). #}
             {% if u.role == 'student' %}
               {% if u.is_sub_food_member %}
                 <span class="badge bg-success ms-1">Sub-food</span>
               {% else %}
                 <span class="badge bg-light text-muted border ms-1">Standard</span>
               {% endif %}
+            {% elif u.role == 'manager' and u.is_sub_food_member %}
+              <span class="badge bg-success ms-1" title="Manager who is also a sub-food member">
+                Sub-food
+              </span>
             {% endif %}
           </td>
           <td class="text-end">
@@ -223,11 +228,14 @@
           {% endif %}
         {% endif %}
 
-        {# ===== 3. Sub-food access (students only) ===== #}
-        {% if u.role == 'student' %}
+        {# ===== 3. Sub-food access (students; admins-only for managers) ===== #}
+        {% if u.role == 'student' or (u.role == 'manager' and current_user.is_admin) %}
         <hr>
         <h6 class="text-uppercase text-muted small mb-2">
           <i class="bi bi-box2"></i> Sub-food access
+          {% if u.role == 'manager' %}
+            <span class="text-muted text-lowercase fw-normal">(manager)</span>
+          {% endif %}
         </h6>
         <form method="post" action="{{ url_for('admin.toggle_member', user_id=u.id) }}"
               class="manage-section d-flex justify-content-between align-items-center">
@@ -237,6 +245,12 @@
               <span class="badge bg-success">Sub-food member</span>
             {% else %}
               <span class="badge bg-light text-muted border">Standard</span>
+            {% endif %}
+            {% if u.role == 'manager' %}
+              <div class="mt-1">
+                Managers may join the food program — their manager
+                permissions are unchanged.
+              </div>
             {% endif %}
           </div>
           <button type="submit" class="btn btn-outline-secondary btn-sm">
@@ -328,7 +342,8 @@
         <div class="form-check mt-2">
           <input class="form-check-input" type="checkbox" name="is_sub_food_member" id="newMember">
           <label class="form-check-label" for="newMember">
-            Substitute food program member (students only)
+            Substitute food program member
+            <span class="text-muted small">(students or managers — not admins)</span>
           </label>
         </div>
       </div>
