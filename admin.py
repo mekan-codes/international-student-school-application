@@ -109,6 +109,18 @@ def _check_can_modify(target: User, *, allow_self: bool = False) -> tuple[bool, 
 @admin_bp.route("/")
 @staff_required
 def dashboard():
+    """Render dashboard summary in a single aggregate pass.
+
+    Performance / data-structure notes:
+    - User counts use SQL `COUNT(*)` instead of pulling rows into Python.
+    - Warehouse/locker totals use `SUM()` aggregates.
+    - Low-stock filtering is pushed to the database (`locker_quantity <=
+      low_stock_threshold`) so we never load the full food table just to
+      filter it in Python — this is the same idea as preferring an indexed
+      lookup over a linear scan in a data structures course.
+    - Each summary value is computed exactly once and passed to the
+      template (no re-querying inside the Jinja loop).
+    """
     total_students = User.query.filter_by(role="student").count()
     sub_food_members = User.query.filter_by(role="student",
                                             is_sub_food_member=True).count()
@@ -117,8 +129,15 @@ def dashboard():
         func.coalesce(func.sum(FoodItem.warehouse_quantity), 0)).scalar()
     total_locker = db.session.query(
         func.coalesce(func.sum(FoodItem.locker_quantity), 0)).scalar()
-    low_stock_items = [f for f in FoodItem.query.filter_by(is_active=True).all()
-                       if f.is_low_stock]
+
+    # SQL-side filter for low stock: avoids loading every food item just to
+    # filter it in Python. Returns only the rows we'll actually render.
+    low_stock_items = (FoodItem.query
+                       .filter_by(is_active=True)
+                       .filter(FoodItem.locker_quantity <=
+                               FoodItem.low_stock_threshold)
+                       .order_by(FoodItem.name)
+                       .all())
 
     return render_template(
         "admin/dashboard.html",
@@ -601,6 +620,8 @@ def distributions():
         quantities = request.form.getlist("quantity[]")
         note = (request.form.get("note") or "").strip()
 
+        # Data structure: dict (hash map) keyed by food_id so duplicate rows
+        # in the form are summed in O(1) per entry instead of an O(n) scan.
         line_map: dict[int, int] = {}
         for fid, qty in zip(food_ids, quantities):
             if not fid or not qty:
@@ -618,6 +639,9 @@ def distributions():
             flash("Please add at least one food and quantity.", "danger")
             return redirect(url_for("admin.distributions"))
 
+        # Data structure: dict (hash map) of FoodItem by id → O(1) lookups
+        # while we validate and apply each line, instead of repeatedly
+        # filtering the foods list.
         items = {f.id: f for f in FoodItem.query.filter(
             FoodItem.id.in_(line_map.keys())).all()}
         for fid, qty in line_map.items():
@@ -729,6 +753,8 @@ def export_distributions_csv():
 @staff_required
 def delete_distribution(dist_id):
     dist = db.session.get(Distribution, dist_id) or abort(404)
+    # Data structure: dict of FoodItem by id for O(1) restock lookups while
+    # reversing each line of the distribution.
     foods = {f.id: f for f in FoodItem.query.filter(
         FoodItem.id.in_([i.food_id for i in dist.items])).all()}
     for item in dist.items:

@@ -21,8 +21,12 @@ The project structure already accommodates future modules.
 
 #### For everyone
 - **Login by email OR student ID** + password.
-- Personal **profile page** — update name, email, phone number, phone
-  privacy, and password (separate, safer change-password flow).
+- Personal **Settings page** (`/settings`) — update name, email, phone
+  number, phone privacy, and password (separate, safer change-password
+  flow). Reachable by clicking the **user chip in the sidebar footer**;
+  no separate "My Profile" item clutters the sidebar.
+  - The legacy `/profile` URL stays valid as a permanent redirect to
+    `/settings` so old links and bookmarks still work.
 
 #### Admin features
 - Dashboard with summary cards and low-stock alerts.
@@ -57,8 +61,9 @@ The project structure already accommodates future modules.
   size when set ("Calories not listed" otherwise).
 - **Standard (non-member) students** see only the general dashboard and
   profile — no food links anywhere in the sidebar.
-- The student profile shows only the basics: name, student ID, email,
-  phone number (if added), plus profile-edit and password-change forms.
+- The student Settings page shows only the basics: name, student ID,
+  email, phone number (if added), plus profile-edit and password-change
+  forms.
 
 ### Planned future features (placeholders shown in the sidebar)
 - Borrowing system
@@ -96,9 +101,37 @@ The project structure already accommodates future modules.
   on next login through their profile.
 
 ### Phone number privacy
-- Each user can store a phone number in their profile.
+- Each user can store a phone number in their Settings page.
 - A `show_phone_number` toggle controls visibility — when off, the number
   is stored but not displayed on directory views or other profiles.
+
+## V1 polish notes (latest pass)
+
+- **Sidebar navigation cleanup.** The standalone "My Profile" link was
+  removed from every sidebar (admin, manager, student). Instead the
+  bottom user chip — avatar, name, and student ID/email — is now itself a
+  clickable link that goes to `/settings`, with hover and active styling
+  so users understand it is interactive. Logout stays right beneath it.
+- **Settings replaces the Profile page.** The route is now `/settings`
+  and the page is titled *Settings*. It groups Profile information,
+  Phone number/privacy, and Password change into one place. `/profile`
+  still works as a `301` redirect to `/settings` for any saved links.
+- **Student-facing labels.** Students never see internal classification
+  wording (`role`, "program subscription", "substitute food membership",
+  "limited access", etc.) anywhere. Standard students see no food links
+  at all; sub-food members see the locker without internal membership
+  wording.
+- **Performance / data structures.** The admin dashboard pushes its
+  low-stock filter into SQL instead of loading every food row and
+  filtering in Python. The Shareable Food Log builds a `dict` (hash
+  map) by food id for O(1) lookups while validating each line of a
+  pickup, and another `dict` when reversing one for the locker restock.
+  Each helper carries a short comment that names the data structure
+  and why it's used (this is a data-structures class project).
+- **Future modules.** Borrowing, Requests to International Department,
+  Announcements, Common Group Chat, and Cleaning Sessions remain in
+  the sidebar as **Coming soon** placeholders only — none of them are
+  implemented in V1.
 
 ## Demo accounts (seeded automatically)
 
@@ -143,7 +176,8 @@ python app.py
 ├── auth.py                 # Login (by email or student_id) / register / logout
 ├── admin.py                # Admin & manager blueprint
 ├── student.py              # Student blueprint (general + food)
-├── profile.py              # Personal profile + password change
+├── profile.py              # Settings page + password change (legacy
+│                           #   /profile redirects to /settings)
 ├── seed.py                 # Demo data seeder
 ├── instance/
 │   └── app.db              # SQLite database (created at runtime)
@@ -153,7 +187,7 @@ python app.py
 │   ├── base.html           # Layout + role-aware sidebar
 │   ├── login.html
 │   ├── register.html
-│   ├── profile.html
+│   ├── settings.html        # was profile.html (renamed in V1 polish)
 │   ├── coming_soon.html
 │   ├── admin/
 │   │   ├── dashboard.html
@@ -177,6 +211,12 @@ python app.py
 Use the seeded accounts:
 
 1. **Admin** (`admin@school.com` / `admin123`)
+   - Sidebar groups: *Dashboard*, *Manage* (Users, Food Items),
+     *Inventory* (Warehouse, Locker, Transfer Stock, Shareable Food Log,
+     Inventory History), *Coming soon* (5 placeholder items). **No
+     "My Profile" item** — click the user chip at the bottom of the
+     sidebar to open *Settings*; it should highlight on hover and stay
+     active while you are on the Settings page.
    - Open *Users* → every row has one **Manage** button. Open it for a
      student and try each section: edit profile, promote to manager,
      toggle membership, reset password, delete (in the *Danger zone*).
@@ -184,8 +224,11 @@ Use the seeded accounts:
    - On *Food Items*, add a new item with calories per serving and a
      serving size; verify the row shows the calories column. Click
      a *Warehouse* or *Locker* quantity → it jumps to that page.
+   - Visit `/profile` directly → 301 redirect to `/settings`.
 
 2. **Manager** (`manager@school.com` / `manager123`)
+   - Sidebar matches the admin layout (same items, same clickable user
+     chip → Settings). No "My Profile" item.
    - Open *Users* → only student rows show a **Manage** button.
      Admin and manager rows display *Protected* / *—* and have no
      edit/promote/reset/delete actions.
@@ -196,18 +239,23 @@ Use the seeded accounts:
      logs.
 
 3. **Sub-food student** (`student1@school.com` / `student123`)
-   - Sidebar shows *My Dashboard*, *Lounge Locker*, *My Profile*, and
-     the coming-soon items. No role label appears anywhere.
+   - Sidebar shows *My Dashboard*, *Lounge Locker*, and the coming-soon
+     items — **no "My Profile" item**. The user chip at the bottom is
+     the way into *Settings*. No role label appears anywhere.
    - *Lounge Locker* lists items in stock with calories per serving and
-     serving size when set, or "Calories not listed" otherwise.
-   - Profile shows only name, student ID, email, and phone number;
+     serving size when set, or "Calories not listed" otherwise. There
+     is no internal "membership" wording on the page.
+   - Settings shows only name, student ID, email, and phone number;
      password change requires current + new + confirm.
 
 4. **Standard student** (`student2@school.com` / `student123`)
-   - Sidebar shows *My Dashboard*, *My Profile*, and the coming-soon items.
-   - **No food links anywhere.** Direct visit to `/student/food` silently
-     redirects back to the dashboard.
-   - Dashboard never mentions roles, programs, membership, or limits.
+   - Sidebar shows *My Dashboard* and the coming-soon items only —
+     **no food link, no "My Profile" link**. The user chip at the bottom
+     is the entry to *Settings*.
+   - Direct visit to `/student/food` silently redirects back to the
+     dashboard.
+   - Dashboard never mentions roles, programs, membership, or limits;
+     it only welcomes the student and lists upcoming features.
 
 You can also log any student in by their student ID — e.g.
 `S002` / `student123`.

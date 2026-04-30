@@ -77,12 +77,6 @@
         <a href="{{ url_for('coming_soon', module='cleaning') }}" class="coming-soon-link">
           <i class="bi bi-droplet"></i> Cleaning Sessions <span class="badge-soon">soon</span>
         </a>
-
-        <div class="nav-section">Account</div>
-        <a href="{{ url_for('profile.index') }}"
-           class="{% if request.endpoint == 'profile.index' %}active{% endif %}">
-          <i class="bi bi-person-circle"></i> My Profile
-        </a>
       </nav>
     {% else %}
       {# ---- Student nav. Food links only for sub-food members. ---- #}
@@ -98,11 +92,6 @@
             <i class="bi bi-archive"></i> Lounge Locker
           </a>
         {% endif %}
-
-        <a href="{{ url_for('profile.index') }}"
-           class="{% if request.endpoint == 'profile.index' %}active{% endif %}">
-          <i class="bi bi-person-circle"></i> My Profile
-        </a>
 
         <div class="nav-section">Coming soon</div>
         <a href="{{ url_for('coming_soon', module='borrowing') }}" class="coming-soon-link">
@@ -123,18 +112,25 @@
       </nav>
     {% endif %}
 
+    {# ---- Sidebar footer: clickable user-chip → /settings, then Logout ---- #}
     <div class="sidebar-footer">
-      <div class="user-chip">
+      <a class="user-chip user-chip-link
+                {% if request.endpoint == 'profile.settings' %}active{% endif %}"
+         href="{{ url_for('profile.settings') }}"
+         title="Open settings">
         <div class="avatar">{{ current_user.name[:1]|upper }}</div>
-        <div>
+        <div class="user-chip-info">
           <div class="user-name">{{ current_user.name }}</div>
           {% if current_user.is_staff %}
-            <div class="user-role">{{ current_user.role_label }}</div>
+            <div class="user-role">{{ current_user.email }}</div>
           {% elif current_user.student_id %}
             <div class="user-role">{{ current_user.student_id }}</div>
+          {% else %}
+            <div class="user-role">{{ current_user.email }}</div>
           {% endif %}
         </div>
-      </div>
+        <i class="bi bi-gear user-chip-icon" aria-hidden="true"></i>
+      </a>
       <a class="logout" href="{{ url_for('auth.logout') }}">
         <i class="bi bi-box-arrow-right"></i> Logout
       </a>
