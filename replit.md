@@ -16,14 +16,21 @@
 ## Layout
 ```
 app.py            entry / app factory + coming-soon route + schema migration
-models.py         User (with phone/privacy/protection flags), FoodItem, ...
+models.py         User, FoodItem, ... + V2: Announcement,
+                  AnnouncementReaction, SupportRequest
 auth.py           login (by email or student_id) / register / logout
 admin.py          admin & manager blueprint (mounted at /admin)
 student.py        student blueprint (general dashboard + food page)
 profile.py        /settings (profile + password); /profile → /settings
+announcements.py  V2 — staff CRUD + student feed + emoji reactions
+requests_bp.py    V2 — student submit/list-own/detail + staff filtered
+                  list/respond/status/delete. File is *_bp.py so it
+                  doesn't shadow the `requests` PyPI library; the
+                  blueprint name is "requests".
 seed.py           demo data
-templates/        Jinja templates
-static/css/       stylesheet
+templates/        Jinja templates (now includes announcements/ and
+                  requests/ subfolders)
+static/css/       stylesheet (V2: announcement-card, reactions, etc.)
 docs/             project spec
 ```
 
@@ -55,6 +62,52 @@ You can sign in with the email or the student ID.
 - Bootstrap modals are placed **outside** `<tbody>` tags.
 - `current_user.is_staff` includes admin AND manager. Use that for nav and
   permission gating; use `is_admin` for admin-only paths.
+
+## V2 modules (Apr 2026)
+
+### Announcements
+- Models: `Announcement` + `AnnouncementReaction`.
+  - `Announcement.AUDIENCES` = everyone / all_students /
+    sub_food_students / staff_only.
+  - `Announcement.PRIORITIES` = normal / important / urgent.
+  - `Announcement.visible_to(user)` returns a SQLAlchemy query with
+    audience + `is_published` filtering pushed into SQL — students
+    never load rows they shouldn't see.
+  - `AnnouncementReaction.EMOJIS` = ('👍', '❤️', '✅', '👀'); unique
+    constraint on `(announcement_id, user_id)` enforces one reaction
+    per user per post.
+- Blueprint `announcements` mounted at `/announcements`.
+  - `/` — `list_view` dispatches by role (staff list vs student feed).
+  - `/new`, `/<id>/edit`, `/<id>/delete`, `/<id>/publish` — staff only.
+  - `/<id>/react` — students/staff; toggles, swaps, or removes the
+    user's reaction in one POST.
+
+### Requests to International Department
+- Model: `SupportRequest` with categories Food / Dormitory /
+  Documents / School life / Health / Other and statuses submitted /
+  in_review / resolved / rejected (`status_label`/`status_badge_class`
+  helpers, `has_response` property).
+- Blueprint `requests` (file `requests_bp.py` to avoid shadowing the
+  `requests` PyPI library) mounted at `/requests`.
+  - `/` — staff get a filtered list (status / category / student /
+    text search, all SQL-side); students get only their own.
+  - `/new` — students submit.
+  - `/<id>` — student sees their own (403 otherwise); staff see any.
+  - `/<id>/respond`, `/<id>/status`, `/<id>/delete` — staff only.
+
+### Dashboard surfacing
+- Admin dashboard: 3 most recent announcements + open-requests
+  counter (statuses submitted + in_review).
+- Student dashboard: 3 most recent announcements visible to that
+  student (via `Announcement.visible_to(current_user)`); the
+  upcoming-features list now only shows Borrowing / Chat / Cleaning.
+
+### Sidebar
+- "Communication" section (Announcements + Requests) appears for
+  staff and students under their respective panels; the old
+  Coming-soon placeholders for those two were removed but
+  `/coming-soon/<slug>` still resolves any unknown slug for
+  back-compat.
 
 ## Recent changes
 - **Phone formatting** in Settings now uses `intl-tel-input` (CDN, no

@@ -148,29 +148,33 @@
 
 {% block extra_scripts %}
 {{ super() }}
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/intlTelInput.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/utils.js"></script>
+{# v23 ships a single bundle that includes the utils. Loading utils.js
+   separately AND passing utilsScript: caused a duplicate-load race that
+   surfaced as an uncaught non-Error in the console. #}
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/intlTelInputWithUtils.min.js"></script>
 <script>
   (function () {
     const input = document.getElementById('phone-input');
     const hidden = document.getElementById('phone-hidden');
     const hint = document.getElementById('phone-hint');
     const form = document.getElementById('profile-form');
-    if (!input || !window.intlTelInput) return;
+    if (!input || !form || !window.intlTelInput) return;
+
+    // Format constants moved to intlTelInput.utils in v23. Fall back to
+    // the integer (1 = INTERNATIONAL) if the namespace isn't ready yet.
+    function intlFormat() {
+      try {
+        return window.intlTelInput.utils.numberFormat.INTERNATIONAL;
+      } catch (_) {
+        return 1;
+      }
+    }
 
     const iti = window.intlTelInput(input, {
-      initialCountry: 'auto',
-      geoIpLookup: function (success) {
-        // Best-effort country guess; falls back to KR (school context).
-        fetch('https://ipapi.co/json/')
-          .then(r => r.json())
-          .then(d => success((d && d.country_code) || 'kr'))
-          .catch(() => success('kr'));
-      },
+      initialCountry: 'kr',          // School context — sensible default.
       separateDialCode: true,
       formatAsYouType: true,
       nationalMode: false,
-      utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/utils.js',
     });
 
     // Live validation hint.
@@ -179,7 +183,8 @@
         hint.classList.remove('text-danger', 'text-success');
         return;
       }
-      const ok = iti.isValidNumber();
+      let ok = false;
+      try { ok = iti.isValidNumber(); } catch (_) { ok = false; }
       hint.classList.toggle('text-danger', !ok);
       hint.classList.toggle('text-success', ok);
     }
@@ -193,14 +198,11 @@
       if (!raw) { hidden.value = ''; return; }
       try {
         if (iti.isValidNumber()) {
-          // E.164 (e.g. +821012345678) plus a separator-friendly intl format.
-          hidden.value = iti.getNumber(intlTelInputUtils.numberFormat.INTERNATIONAL);
+          hidden.value = iti.getNumber(intlFormat());
         } else {
-          // Fall back to whatever the user typed (server still stores it,
-          // but the format may be irregular).
           hidden.value = raw;
         }
-      } catch (e) {
+      } catch (_) {
         hidden.value = raw;
       }
     });

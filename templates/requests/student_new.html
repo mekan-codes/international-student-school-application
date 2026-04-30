@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}New request{% endblock %}
+
+{% block content %}
+<div class="card">
+  <div class="card-header">
+    <strong><i class="bi bi-envelope-paper"></i> Submit a request</strong>
+  </div>
+  <div class="card-body">
+    <p class="text-muted">
+      Use this form to ask a question or request help from the
+      International Department. You can track the status and read the
+      response from your <a href="{{ url_for('requests.list_view') }}">My
+      Requests</a> page.
+    </p>
+    <form method="post">
+      <div class="row">
+        <div class="col-md-5 mb-3">
+          <label class="form-label">Category</label>
+          <select class="form-select" name="category" required>
+            <option value="" disabled selected>Choose a category…</option>
+            {% for c in categories %}
+              <option value="{{ c }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-md-7 mb-3">
+          <label class="form-label">Title</label>
+          <input class="form-control" name="title" maxlength="160" required
+                 placeholder="Short summary of your request">
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" name="description" rows="6" required
+                  placeholder="Please give as much context as you can."></textarea>
+      </div>
+
+      <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">
+          <i class="bi bi-send"></i> Submit request
+        </button>
+        <a class="btn btn-outline-secondary"
+           href="{{ url_for('requests.list_view') }}">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}

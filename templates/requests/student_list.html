@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}My Requests{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <p class="text-muted mb-0">
+    Submit a question or request to the International Department, and check
+    the status and response here.
+  </p>
+  <a class="btn btn-primary" href="{{ url_for('requests.new') }}">
+    <i class="bi bi-plus-lg"></i> New request
+  </a>
+</div>
+
+{% if not rows %}
+  <div class="card">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-envelope-paper" style="font-size:2rem;"></i>
+      <div class="mt-2">You haven't submitted any requests yet.</div>
+      <a class="btn btn-outline-primary mt-3" href="{{ url_for('requests.new') }}">
+        Submit your first request
+      </a>
+    </div>
+  </div>
+{% else %}
+  {% for r in rows %}
+    <article class="card mb-3 request-card">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h6 class="mb-1">
+              <a href="{{ url_for('requests.detail', req_id=r.id) }}"
+                 class="text-decoration-none text-reset">
+                {{ r.title }}
+              </a>
+            </h6>
+            <div class="text-muted small">
+              <span class="badge bg-light text-dark border">{{ r.category }}</span>
+              <span class="mx-1">·</span>
+              <i class="bi bi-clock"></i>
+              <time datetime="{{ r.created_at.isoformat() }}">
+                {{ r.created_at.strftime('%b %d, %Y · %H:%M') }} UTC
+              </time>
+            </div>
+          </div>
+          <span class="badge {{ r.status_badge_class }}">{{ r.status_label }}</span>
+        </div>
+
+        {% if r.has_response %}
+          <div class="alert alert-light border mt-3 mb-0">
+            <strong><i class="bi bi-reply"></i> Response from staff:</strong>
+            <div class="mt-1" style="white-space:pre-wrap;">{{ r.admin_response }}</div>
+            {% if r.handled_by_name %}
+              <div class="text-muted small mt-2">— {{ r.handled_by_name }}</div>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </article>
+  {% endfor %}
+{% endif %}
+{% endblock %}

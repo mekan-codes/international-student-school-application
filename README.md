@@ -1,7 +1,8 @@
 # International Lounge
 
 A web app to centralize daily-life systems for international students.
-**Version 1** focuses on the **substitute food management module**.
+**Version 2** adds **Announcements** and **Requests to the International
+Department** on top of the V1 substitute-food management module.
 
 ---
 
@@ -12,10 +13,56 @@ rotations, borrowed equipment, announcements) that today are tracked in
 spreadsheets and group chats. The International Lounge gradually replaces
 those spreadsheets with a single, role-based dashboard.
 
-## Version 1 scope
+## Version 2 scope
 
-Only the **substitute food management module** is implemented in V1.
-The project structure already accommodates future modules.
+Implemented modules:
+- **Substitute food management** (V1, unchanged).
+- **Announcements** — staff post; students see what's published and
+  matches their audience; optional emoji reactions.
+- **Requests to International Department** — students submit support
+  tickets; staff filter, respond, and update status.
+
+Borrowing, Common Group Chat, and Cleaning Sessions remain "Coming soon"
+placeholders in the sidebar.
+
+### V2 module: Announcements
+
+- **Staff (admin/manager) CRUD** at `/announcements/` — create, edit,
+  delete, and toggle Draft/Published with a single click.
+- **Audiences** — `everyone`, `all_students`, `sub_food_students`,
+  `staff_only`. Audience filtering runs in SQL via
+  `Announcement.visible_to(current_user)`, so students never receive
+  rows they shouldn't see.
+- **Priorities** — `normal`, `important`, `urgent` (urgent posts get a
+  highlighted card on the student feed).
+- **Reactions** — students can react with 👍 ❤️ ✅ 👀. Each user has
+  exactly one reaction per announcement (clicking the same emoji
+  removes it; clicking another swaps it).
+- **Recent announcements widget** appears on both the admin and student
+  dashboards (3 most recent visible to the viewer).
+
+### V2 module: Requests to International Department
+
+- **Students** submit a request at `/requests/new` (category, title,
+  description), see only their own list at `/requests/`, and view their
+  own detail page including any staff response.
+- **Categories**: Food, Dormitory, Documents, School life, Health,
+  Other.
+- **Statuses**: submitted, in review, resolved, rejected (color-coded
+  badges).
+- **Staff** see all requests at `/requests/` with **filters** for
+  status, category, student, and free-text search (all SQL-side).
+  Staff can write a response, change status, and delete a request.
+- The admin dashboard surfaces an **Open requests** counter linking
+  straight to the staff triage list.
+
+> Requests vs. Borrowing — these are different: *Requests* are free-form
+> support tickets to the International Department. *Borrowing* (still
+> coming soon) will manage physical items checked out from the lounge.
+
+## Version 1 scope (still active)
+
+The **substitute food management module** is unchanged from V1.
 
 ### Current features
 
@@ -191,12 +238,18 @@ python app.py
 ```
 .
 ├── app.py                  # Flask app factory + entry point + schema migration
-├── models.py               # SQLAlchemy models
+├── models.py               # SQLAlchemy models (V2 adds Announcement,
+│                           #   AnnouncementReaction, SupportRequest)
 ├── auth.py                 # Login (by email or student_id) / register / logout
 ├── admin.py                # Admin & manager blueprint
 ├── student.py              # Student blueprint (general + food)
 ├── profile.py              # Settings page + password change (legacy
 │                           #   /profile redirects to /settings)
+├── announcements.py        # V2: Announcements blueprint (staff CRUD,
+│                           #   student feed, emoji reactions)
+├── requests_bp.py          # V2: Requests blueprint (named "requests";
+│                           #   file is *_bp.py to avoid shadowing the
+│                           #   `requests` PyPI library)
 ├── seed.py                 # Demo data seeder
 ├── instance/
 │   └── app.db              # SQLite database (created at runtime)
@@ -209,7 +262,7 @@ python app.py
 │   ├── settings.html        # was profile.html (renamed in V1 polish)
 │   ├── coming_soon.html
 │   ├── admin/
-│   │   ├── dashboard.html
+│   │   ├── dashboard.html   # V2: + recent announcements + open req count
 │   │   ├── users.html       # was students.html
 │   │   ├── food_items.html
 │   │   ├── warehouse.html
@@ -217,9 +270,18 @@ python app.py
 │   │   ├── transfer.html
 │   │   ├── distributions.html
 │   │   └── logs.html
-│   └── student/
-│       ├── dashboard.html   # general dashboard (no food info for non-members)
-│       └── food.html        # locker food (members only)
+│   ├── student/
+│   │   ├── dashboard.html   # V2: + recent announcements widget
+│   │   └── food.html        # locker food (members only)
+│   ├── announcements/       # V2
+│   │   ├── staff_list.html
+│   │   ├── student_list.html
+│   │   └── form.html
+│   └── requests/            # V2
+│       ├── student_list.html
+│       ├── student_new.html
+│       ├── admin_list.html
+│       └── detail.html
 ├── docs/
 │   └── project-spec.md
 └── README.md
@@ -272,13 +334,40 @@ Use the seeded accounts:
      toast disappears on its own after a few seconds.
 
 4. **Standard student** (`student2@school.com` / `student123`)
-   - Sidebar shows *Homepage* and the coming-soon items only — no food
-     link, no "My Profile" link. The user chip at the bottom is the
-     entry to *Settings*.
+   - Sidebar shows *Homepage*, the V2 **Communication** section
+     (Announcements, Requests), and the remaining coming-soon items —
+     no food link, no "My Profile" link. The user chip at the bottom
+     is the entry to *Settings*.
    - Direct visit to `/student/food` silently redirects back to the
      dashboard.
    - Dashboard never mentions roles, programs, membership, or limits;
-     it only welcomes the student and lists upcoming features.
+     it shows the welcome card, the **Recent announcements** widget,
+     and the upcoming-features list.
 
 You can also log any student in by their student ID — e.g.
 `S002` / `student123`.
+
+### V2 testing flows
+
+5. **Announcements (admin)** — sign in as admin, open *Announcements*,
+   click *New*. Try each priority and audience. Save as Draft → it
+   shows a *Draft* badge and is invisible to students. Click *Publish*
+   on the row → badge flips to *Published*. Edit / Delete on the same
+   row. The admin dashboard's *Recent announcements* card refreshes.
+
+6. **Announcements (student)** — sign in as `student2` (standard,
+   non-member). The feed shows everything published to *everyone* and
+   *all_students*, **never** *staff_only* or *sub_food_students*. Sign
+   in as `student1` (sub-food member) — the feed additionally shows
+   *sub_food_students* posts. React to a post with 👍 → counter goes
+   up; click 👍 again → it goes back down; click ❤️ → reaction swaps
+   (one reaction per user per announcement).
+
+7. **Requests (student)** — sign in as `student2`, open *Requests*,
+   click *New request*, pick a category, submit. The list shows only
+   your own requests. Visit any other student's request URL → 403.
+
+8. **Requests (staff)** — sign in as admin, open *Requests*. Filter
+   by status, category, student, or text. Open a request → write a
+   response, change the status, or delete it. The student sees the
+   response and updated status on their own detail page.

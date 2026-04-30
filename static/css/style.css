@@ -475,3 +475,53 @@ a { text-decoration: none; }
   border-radius: 8px;
   padding: 0.75rem 1rem;
 }
+
+/* =============================================================
+   V2: Announcements & Requests
+   ============================================================= */
+
+/* Announcement post card — header on top, body below; matches the
+   "modern messenger" pattern requested in the spec. */
+.announcement-card { border-left: 3px solid transparent; }
+.announcement-urgent { border-left-color: #dc3545; background: #fff7f7; }
+
+.announcement-meta { display: inline-flex; align-items: center; flex-wrap: wrap; gap: 0.25rem; }
+.announcement-body { white-space: pre-wrap; line-height: 1.5; color: var(--text); }
+
+/* Reaction pills */
+.reactions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.reaction-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem;
+  padding: 0.2rem 0.55rem;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  border-radius: 999px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+.reaction-btn:hover { background: #eef2ff; border-color: #c7d2fe; }
+.reaction-btn-active {
+  background: #e0e7ff; border-color: var(--primary); color: var(--primary-dark);
+  font-weight: 600;
+}
+.reaction-emoji { font-size: 1rem; line-height: 1; }
+.reaction-count { font-size: 0.8rem; color: var(--muted); }
+.reaction-btn-active .reaction-count { color: var(--primary-dark); }
+
+/* Request card */
+.request-card .badge { font-weight: 500; }
+
+/* Recent-announcements widget shown on the dashboard */
+.recent-ann-item {
+  display: block;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  color: var(--text);
+  transition: background 0.12s, border-color 0.12s;
+}
+.recent-ann-item:hover { background: #f8fafc; border-color: #c7d2fe; color: var(--text); }
+.recent-ann-item .recent-ann-title { font-weight: 600; }
+.recent-ann-item .recent-ann-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }

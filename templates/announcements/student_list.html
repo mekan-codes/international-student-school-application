@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Announcements{% endblock %}
+
+{% block content %}
+{% if not items %}
+  <div class="card">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-megaphone" style="font-size:2rem;"></i>
+      <div class="mt-2">No announcements yet. Check back soon.</div>
+    </div>
+  </div>
+{% else %}
+  {% for a in items %}
+    <article id="a-{{ a.id }}" class="card mb-3 announcement-card
+            {% if a.priority == 'urgent' %}announcement-urgent{% endif %}">
+      <div class="card-body">
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div>
+            <h5 class="mb-1">{{ a.title }}</h5>
+            <div class="announcement-meta text-muted small">
+              <i class="bi bi-person"></i> {{ a.author_name }}
+              <span class="mx-1">·</span>
+              <i class="bi bi-clock"></i>
+              <time datetime="{{ a.created_at.isoformat() }}">
+                {{ a.created_at.strftime('%b %d, %Y · %H:%M') }} UTC
+              </time>
+            </div>
+          </div>
+          <span class="badge {{ a.priority_badge_class }}">{{ a.priority_label }}</span>
+        </div>
+
+        <hr class="my-3">
+        <div class="announcement-body">{{ a.content }}</div>
+
+        {# ---- Reactions ---- #}
+        {% set counts = a.reaction_counts() %}
+        {% set my = a.reaction_for(current_user) %}
+        <div class="reactions mt-3">
+          {% for emoji in ['👍','❤️','✅','👀'] %}
+            <form method="post" action="{{ url_for('announcements.react', ann_id=a.id) }}"
+                  class="d-inline">
+              <input type="hidden" name="emoji" value="{{ emoji }}">
+              <button class="reaction-btn {% if my == emoji %}reaction-btn-active{% endif %}"
+                      type="submit" title="React with {{ emoji }}">
+                <span class="reaction-emoji">{{ emoji }}</span>
+                <span class="reaction-count">{{ counts.get(emoji, 0) }}</span>
+              </button>
+            </form>
+          {% endfor %}
+        </div>
+      </div>
+    </article>
+  {% endfor %}
+{% endif %}
+{% endblock %}

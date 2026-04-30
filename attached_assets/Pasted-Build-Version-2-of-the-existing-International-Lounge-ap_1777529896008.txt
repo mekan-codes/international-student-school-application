@@ -1,0 +1,390 @@
+Build Version 2 of the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve the current UI style, spacing, colors, sidebar, layout, and role system.
+- Keep all Version 1 features working.
+- Keep the app runnable.
+- Add only the Version 2 features below.
+- Do not implement borrowing, cleaning sessions, or chat yet. Keep them as Coming Soon placeholders.
+
+Current app:
+International Lounge is a Flask + SQLite web app for international students.
+V1 already includes:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile
+- phone number privacy
+- substitute food management
+- warehouse/locker inventory
+- food logs/history
+- shareable food log
+- role-based sidebar
+
+Version 2 goal:
+Add two school communication modules:
+1. Announcements
+2. Requests to International Department
+
+==================================================
+FEATURE 1: ANNOUNCEMENTS
+==================================================
+
+Purpose:
+Admins/managers can post official announcements. Students can read published announcements.
+
+Roles:
+Admin:
+- create announcements
+- edit announcements
+- delete announcements
+- publish/unpublish announcements
+- view all announcements
+
+Manager:
+- create announcements
+- edit announcements
+- delete announcements
+- publish/unpublish announcements
+- view all announcements
+
+Student:
+- view published announcements only
+- cannot create/edit/delete announcements
+- cannot see unpublished announcements
+
+Announcement fields:
+- id
+- title
+- content
+- author_user_id
+- author_name
+- priority
+- target_audience
+- is_published
+- created_at
+- updated_at
+
+Priority values:
+- normal
+- important
+- urgent
+
+Target audience values:
+- everyone
+- all_students
+- sub_food_students
+- staff_only
+
+Visibility rules:
+- everyone: visible to all logged-in users
+- all_students: visible to students only
+- sub_food_students: visible only to students with sub-food access
+- staff_only: visible only to admins/managers
+- students must never see unpublished announcements
+
+UI behavior:
+- Date/time should be displayed like modern messenger/post UI:
+  - near the title or beside the announcement header
+  - NOT inside the message body
+- Show author separately.
+- Show priority as a badge.
+- Show target audience as a badge for admin/manager only.
+- Students should not see internal management labels unnecessarily.
+- Sort newest first.
+
+Pages/routes:
+1. Admin/Manager Announcements Management page
+   - list all announcements
+   - create announcement form
+   - edit announcement
+   - delete announcement with confirmation
+   - publish/unpublish toggle
+   - priority badge
+   - target audience badge
+   - published/unpublished badge
+   - newest first
+
+2. Student Announcements page
+   - list only published announcements visible to that student
+   - show title, content, priority, author, date/time
+   - newest first
+   - clean card layout
+
+3. Homepage integration
+   - Add a “Recent Announcements” section/card on student Homepage.
+   - Show latest 3 visible published announcements.
+   - Add “View all” link to Announcements page.
+   - For admin/manager Homepage, optionally show recent announcements summary.
+
+Sidebar:
+- Replace the current “Announcements Coming Soon” placeholder with a real Announcements link.
+- Show it to all logged-in users.
+- Admin/manager should open the management view.
+- Student should open the read-only student view.
+
+Optional if simple:
+Announcement reactions.
+- Add simple reactions under announcements: 👍 ❤️ ✅ 👀
+- Users can react to an announcement.
+- Each user can have only one reaction per announcement.
+- Clicking another reaction changes their reaction.
+- Clicking same reaction again removes it.
+- Show reaction counts under the announcement.
+- If this adds too much complexity, leave it for later and mention it in docs as planned.
+
+==================================================
+FEATURE 2: REQUESTS TO INTERNATIONAL DEPARTMENT
+==================================================
+
+Purpose:
+Students can submit requests/questions to the International Department.
+Admins/managers can review, respond, and update status.
+
+This is a support-ticket system, not borrowing.
+Borrowing physical items will be a separate future module.
+
+Roles:
+Student:
+- create a request
+- view own requests only
+- view status and admin/manager response
+- cannot view other students’ requests
+- cannot change status
+- cannot edit admin response
+
+Admin:
+- view all requests
+- filter requests
+- update status
+- write/edit response
+- mark handled by themselves
+- delete request if needed
+
+Manager:
+- same operational permissions as admin for requests
+- view all requests
+- filter requests
+- update status
+- write/edit response
+- mark handled by themselves
+
+Request fields:
+- id
+- student_user_id
+- student_name
+- category
+- title
+- description
+- status
+- admin_response
+- handled_by_user_id
+- handled_by_name
+- created_at
+- updated_at
+
+Categories:
+- Food
+- Dormitory
+- Documents
+- School life
+- Health
+- Other
+
+Status values:
+- submitted
+- in_review
+- resolved
+- rejected
+
+Validation:
+- category is required
+- title is required
+- description is required
+- status defaults to submitted
+- students can only see their own requests
+- title and description should not be empty
+- response can be empty until staff replies
+
+Pages/routes:
+1. Student Requests page
+   - create request form
+   - list my requests
+   - show category
+   - show status badge
+   - show date/time near the request header, not inside the text body
+   - show admin/manager response if available
+   - newest first
+
+2. Admin/Manager Requests Management page
+   - list all requests
+   - filter by status
+   - filter by category
+   - filter by student if easy
+   - search by title/student if easy
+   - open request details
+   - update status
+   - write/edit response
+   - delete request with confirmation if needed
+   - newest first
+
+Sidebar:
+- Replace the current “Requests to International Department Coming Soon” placeholder with a real Requests link.
+- Students see “Requests”
+- Admin/manager see “Manage Requests” or “Requests”
+
+==================================================
+UI REQUIREMENTS
+==================================================
+
+Use the existing International Lounge design.
+
+General:
+- clean cards/tables/forms
+- consistent buttons
+- consistent badges
+- no crowded action buttons
+- modals or detail panels are okay if they match the current UI
+- keep sidebar clean
+- keep responsive layout
+- date/time should appear like modern apps/posts, near the header, not inside the message text
+
+Badges:
+Announcement priority:
+- normal
+- important
+- urgent
+
+Announcement target audience:
+- everyone
+- all_students
+- sub_food_students
+- staff_only
+
+Request status:
+- submitted
+- in_review
+- resolved
+- rejected
+
+Do not expose internal role/program labels to students.
+
+==================================================
+DATA STRUCTURES / PERFORMANCE
+==================================================
+
+Because this is a data structures class project, add short comments where useful.
+
+Use appropriate structures:
+- database queries with filters instead of loading everything and filtering manually
+- dictionaries/hash maps for O(1) lookup where needed
+- pagination if request/announcement lists become long
+- newest-first ordering using database query
+
+For requests:
+- filter by status/category in database queries if possible
+- avoid scanning all requests manually
+
+For announcements:
+- students should query only published and visible announcements
+- do not load unpublished announcements for students
+
+==================================================
+DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Add:
+- Version 2 scope
+- Announcements module
+- Requests to International Department module
+- difference between Requests and Borrowing
+- role permissions
+- new database models/tables
+- new routes/pages
+- testing instructions
+
+Future features still planned but not implemented:
+- Borrowing system
+- Cleaning Sessions
+- Common Group Chat
+
+Mention:
+- announcement reactions are implemented if you implemented them
+- otherwise list reactions as planned future enhancement
+
+==================================================
+TESTING REQUIREMENTS
+==================================================
+
+After implementation, provide clear testing steps.
+
+Admin flow:
+1. Login as admin
+2. Create announcement
+3. Set priority and target audience
+4. Publish/unpublish announcement
+5. Edit/delete announcement
+6. View all student requests
+7. Respond to a request
+8. Change request status
+
+Manager flow:
+1. Login as manager
+2. Create announcement
+3. Manage requests
+4. Confirm manager still cannot access restricted admin-only user controls
+
+Student flow:
+1. Login as standard student
+2. View announcements visible to standard students
+3. Submit request
+4. View own request status
+5. Confirm student cannot see other students’ requests
+6. Confirm student cannot access admin/manager pages
+7. Confirm standard student still cannot see food pages
+
+Sub-food student flow:
+1. Login as sub-food student
+2. View announcements visible to sub-food students
+3. Submit request
+4. Confirm Lounge Locker still works from V1
+
+Regression tests:
+- Login by email still works
+- Login by student ID still works
+- Settings page still works
+- Phone privacy still works
+- V1 food inventory pages still work
+- Standard students still do not see food pages
+- Sub-food students still see Lounge Locker
+
+==================================================
+IMPORTANT SAFETY RULES
+==================================================
+
+Do not break:
+- login by email or student ID
+- settings/profile page
+- phone number formatting/privacy
+- admin/manager/student permissions
+- standard student hiding food pages
+- sub-food student locker page
+- substitute food inventory logic
+- inventory logs/history
+- shareable food log
+- current sidebar footer/user chip behavior
+
+After finishing, summarize:
+1. files changed
+2. database/schema changes
+3. new routes/pages
+4. new sidebar items
+5. how to test admin flow
+6. how to test manager flow
+7. how to test standard student flow
+8. how to test sub-food student flow
+9. whether announcement reactions were implemented or left for later
+10. any limitations or things left for Version 3
