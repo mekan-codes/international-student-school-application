@@ -366,6 +366,30 @@ Routes smoke-tested while logged in (admin + S001):
 - Last-admin guard, protected-account guard, and overdraw guards all confirmed present.
 - No bugs found.
 
+## V3.4 — Label Cleanup & Polish (Apr 2026)
+
+### Sidebar label updates (both roles)
+| Old label | New label |
+|---|---|
+| Homepage | Home |
+| Requests | Intl Dept. Requests |
+| Resources | Useful Resources |
+| Borrowing | Shared Item Borrowing |
+| Cleaning | Lounge Cleaning |
+
+### Page title updates
+| Template | Old title | New title |
+|---|---|---|
+| cleaning/admin.html + student.html | Cleaning | Lounge Cleaning |
+| borrowing/admin.html + student.html | Borrowing / Manage Borrowing | Shared Item Borrowing |
+| requests/student_list.html | My Requests | Intl Dept. Requests |
+| requests/admin_list.html | Manage Requests | Intl Dept. Requests |
+| resources.html | Resources | Useful Resources |
+
+### Settings phone input
+- Verbose helper text "Pick your country, then type your number..." replaced with a concise one-liner.
+- Country picker, formatting functionality, and privacy checkbox unchanged.
+
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a
 dev-only string when unset.

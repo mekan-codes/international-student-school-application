@@ -1,0 +1,584 @@
+Polish the existing International Lounge app with final UI label cleanup, settings cleanup, workflow fixes, and stability checks.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve the current UI style, spacing, colors, sidebar logic, and role system.
+- Keep all existing V1, V2, and V3 features working.
+- Do not add common group chat yet.
+- Focus on final polish, clearer wording, cleaner admin UI, resources management, cleaning workflow cleanup, and stability.
+
+Current app modules:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile and phone privacy
+- substitute food management
+- warehouse/locker inventory
+- shareable food log
+- inventory history
+- announcements
+- requests to international department
+- borrowing/shared items
+- lounge cleaning teams/sessions
+- resources/common drives
+
+==================================================
+1. SIDEBAR AND PAGE LABEL CLEANUP
+==================================================
+
+Update user-facing navigation labels.
+
+Use these sidebar labels:
+
+- Homepage → Home
+- Resources → Useful Resources
+- Cleaning → Lounge Cleaning
+- Requests → Intl Dept. Requests
+- Borrowing → Shared Item Borrowing
+
+Use these full page titles:
+
+- Home
+- Useful Resources
+- Lounge Cleaning
+- Requests to International Department
+- Shared Item Borrowing
+- Substitute Food Locker
+
+Rules:
+- Update sidebar labels.
+- Update page titles/headings where appropriate.
+- Preserve existing routes if changing routes is risky.
+- Do not break links.
+- Keep internal function names unchanged if safer.
+
+Preferred sidebar for students:
+
+Home
+
+Communication:
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+
+Lounge Life:
+- Shared Item Borrowing
+- Lounge Cleaning
+- Substitute Food Locker only for substitute-food students
+
+Coming Soon:
+- Group Chat
+
+Preferred sidebar for admin/manager:
+
+Home
+
+Management:
+- Users
+- Food Items
+
+Inventory:
+- Warehouse
+- Locker
+- Transfer Stock
+- Shareable Food Log
+- Inventory History
+
+Communication:
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+
+Lounge Life:
+- Shared Item Borrowing
+- Lounge Cleaning
+
+Coming Soon:
+- Group Chat
+
+Keep sidebar footer/user chip behavior unchanged.
+
+==================================================
+2. SETTINGS PHONE TEXT CLEANUP
+==================================================
+
+In Settings, keep the phone label simple:
+
+Phone number (optional)
+
+Remove unnecessary helper text such as:
+“Pick your country, then type your number — it will format itself and be stored in international format...”
+
+Do not remove the phone formatting functionality.
+Do not remove the country picker.
+Do not remove the phone privacy checkbox.
+
+Keep:
+- phone number input
+- country code picker
+- show/hide phone number checkbox
+- privacy behavior
+
+The UI should look cleaner and less text-heavy.
+
+==================================================
+3. EDITABLE USEFUL RESOURCES
+==================================================
+
+If Useful Resources currently uses hardcoded cards only, convert it to database-backed resources.
+
+Resource fields:
+- id
+- title
+- description
+- url
+- is_active
+- created_by_user_id
+- created_at
+- updated_at
+
+Admin/manager features:
+- view all resources
+- add resource
+- edit resource title, description, URL, active/inactive status
+- delete resource with confirmation
+
+Student features:
+- view only active resources
+- click resource link, opening in a new tab
+
+UI:
+- Students see clean resource cards.
+- Admin/manager see resource cards with one Manage/Edit control.
+- Links should open in new tab with target="_blank" and rel="noopener noreferrer".
+- Validate URL format if simple.
+- Use placeholder resources only if database is empty.
+
+==================================================
+4. CLEANING TEAM VISIBILITY FOR STUDENTS
+==================================================
+
+Students can see their assigned team name, such as Team 1, but they should also be able to see teammates.
+
+Improve this:
+- Make the team badge/name clickable on the student Lounge Cleaning page.
+- When clicked, show the team members.
+- This can be a modal, panel, or simple team detail page.
+- Do NOT add a new sidebar tab just for teams.
+
+Team member display:
+- team name
+- student names
+- student IDs if available
+- phone number only if show_phone_number is true
+- never show hidden/private phone numbers
+
+Access rules:
+- Students should only be able to view teams they belong to.
+- Admin/manager can still view/manage all teams.
+
+==================================================
+5. TARGETED ANNOUNCEMENTS TO SPECIFIC STUDENTS
+==================================================
+
+Improve announcement target audience.
+
+Current target audiences may include:
+- everyone
+- all_students
+- sub_food_students
+- staff_only
+
+Add:
+- specific_students
+
+When admin/manager selects “Specific students”:
+- show a multi-select list of students
+- admin/manager can choose one or more students
+- announcement is visible only to selected students and staff
+- students not selected must not see it
+- unpublished announcements must still be hidden from students
+
+Add a join/model/table if needed:
+
+AnnouncementRecipient:
+- id
+- announcement_id
+- student_user_id
+
+Rules:
+- if target_audience is specific_students, at least one student must be selected
+- admin/manager can edit selected students later
+- students should not see internal target labels unless necessary
+- admin/manager should see target audience and selected recipients in management view
+
+==================================================
+6. CLEANING SESSION DATE RANGE AND POSTPONE WORKFLOW
+==================================================
+
+Cleaning should be date-range based instead of exact time based.
+
+Use:
+- start_date
+- end_date
+
+Do not require exact start_time/end_time.
+If existing start_time/end_time fields exist, keep them for compatibility but do not emphasize them in UI.
+
+Example display:
+Apr 30, 2026 – May 02, 2026
+
+Cleaning session statuses should support:
+- scheduled
+- marked_done
+- approved
+- postponed
+- cancelled
+
+Task statuses can remain:
+- assigned
+- marked_done
+- verified_done
+- missed
+
+Student/team workflow:
+- team members mark subtasks done
+- when all subtasks are marked_done or verified_done, show that the team has submitted/completed the work
+- staff must approve the whole cleaning session
+- after staff approval, session status becomes approved
+- assigned team can see that their work was approved
+
+Admin/manager workflow:
+- create cleaning session with assigned team and start_date/end_date
+- add subtasks
+- postpone session:
+  - choose new start_date
+  - choose new end_date
+  - optionally add postpone note
+  - preserve assigned team and tasks
+  - update the date range
+  - show a note/history that it was postponed if easy
+- approve session:
+  - verify/approve the team’s work
+  - session status becomes approved
+- cancel session if needed
+
+Validation:
+- end_date cannot be before start_date
+- cancelled sessions cannot be marked done by students
+- approved sessions cannot be changed by students
+- students can only mark tasks for sessions assigned to their team
+
+==================================================
+7. CLEANING ADMIN UI CLEANUP
+==================================================
+
+The admin/manager Lounge Cleaning page is too crowded.
+Each subtask currently shows too many visible buttons.
+
+Improve it:
+- Show one clean Manage button, dropdown, or modal per subtask.
+- Inside Manage, include:
+  - verify task
+  - mark missed
+  - reset to assigned
+  - delete task
+  - edit/admin note if supported
+
+Task row/card should mainly show:
+- task name
+- status badge
+- marked done by
+- verified by if verified
+- short note if present
+- one Manage button for staff
+
+Session-level actions should also be cleaner:
+- Add subtask
+- Postpone
+- Approve session
+- Cancel session
+- Delete session
+
+Do not put too many action buttons in one line.
+Use a clean action area, dropdown, or modal.
+
+==================================================
+8. CLEANING TASK STATUS CORRECTION
+==================================================
+
+Admin/manager should be able to change a task status if needed.
+
+Allowed staff task status changes:
+- assigned
+- marked_done
+- verified_done
+- missed
+
+Rules:
+- Students can mark tasks done only if the session is active/scheduled and their team is assigned.
+- Students cannot verify tasks.
+- Students cannot change missed/verified/cancelled tasks.
+- Admin/manager can reset a missed task back to assigned if needed.
+- Admin/manager can verify a marked_done task.
+- Admin/manager can mark any non-deleted task missed.
+- Admin/manager can delete a task if needed.
+
+If the session is cancelled:
+- students cannot mark tasks done
+- admin/manager can still inspect/manage records where appropriate, but avoid accidental changes unless explicitly using Manage
+
+If the session is approved:
+- students cannot change tasks anymore
+
+==================================================
+9. STUDENT CLEANING PAGE POLISH
+==================================================
+
+Currently when a student marks a task done, the button may say “Update”, which is unclear.
+
+Fix this UX.
+
+For assigned tasks:
+- show optional note input
+- show “Mark done” button
+
+For marked_done tasks:
+- show text:
+  Waiting for staff verification
+- if note editing is supported, button should say “Update note”
+- if note editing is not actually supported, remove the button completely
+- do not show a vague “Update” button
+
+For verified_done tasks:
+- show:
+  Verified by [name]
+- no student action button
+
+For missed tasks:
+- show:
+  Marked missed by staff
+- no student action button
+
+For approved sessions:
+- show:
+  This cleaning session has been approved.
+- no student action buttons
+
+==================================================
+10. USERS PAGE UI POLISH
+==================================================
+
+The Users page should look less like a raw database table.
+
+Default columns should be:
+- Name
+- Student ID
+- Email
+- Status
+- Actions
+
+Move less frequently needed information into the Manage panel:
+- role
+- phone
+- substitute food access
+- created date
+- password reset
+- protected status details
+
+Badges:
+- Replace technical “No” with “Standard”
+- Replace “Member” with “Substitute Food”
+- Keep Admin, Manager, Student badges clean
+- Protected admin should remain clearly protected
+
+Actions:
+- Keep only one main Manage button per row.
+- Inside Manage panel, organize sections:
+  1. Profile
+  2. Role & permissions
+  3. Substitute food access
+  4. Password reset
+  5. Danger zone
+
+Search/filter:
+- Add search if simple:
+  - search by name
+  - student ID
+  - email
+- Keep role filter.
+- If search is risky, skip it and mention it.
+
+Summary cards:
+Add small summary cards above the table if simple:
+- Total users
+- Students
+- Managers
+- Substitute food members
+
+Do not break permission rules:
+- Manager cannot edit admin/manager accounts.
+- Manager cannot create managers.
+- Admin cannot delete/demote last admin.
+- Protected accounts stay protected.
+
+==================================================
+11. SUBSTITUTE FOOD LOCKER SELF-PICKUP CHECK
+==================================================
+
+Confirm this feature works correctly if already implemented.
+
+Rules:
+- student-facing label should be Substitute Food Locker
+- only substitute-food students can access it
+- standard students cannot see or access it
+- substitute-food students can take food online
+- one Take selected food action can include multiple foods
+- locker quantities decrease correctly
+- shareable food log shows grouped pickup
+- inventory history records entries
+- Recently taken by me shows last pickups
+
+Fix any bugs found, but do not redesign it.
+
+==================================================
+12. FINAL STABILITY AND PERMISSION AUDIT
+==================================================
+
+Audit the whole app.
+
+Check role permissions:
+- admin
+- manager
+- standard student
+- substitute-food student
+
+Rules:
+- students must not access admin/manager pages
+- standard students must not see food pages
+- substitute-food students can see and use Substitute Food Locker
+- managers cannot perform restricted admin-only actions
+- protected admin accounts remain protected
+- last admin cannot be deleted or demoted
+
+Check sidebar visibility:
+Students:
+- Home
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+- Shared Item Borrowing
+- Lounge Cleaning
+- Substitute Food Locker only if substitute-food student
+- Group Chat as Coming Soon only
+
+Admin/manager:
+- Home
+- Users
+- Food Items
+- Warehouse
+- Locker
+- Transfer Stock
+- Shareable Food Log
+- Inventory History
+- Announcements
+- Intl Dept. Requests
+- Useful Resources
+- Shared Item Borrowing
+- Lounge Cleaning
+- Group Chat as Coming Soon only
+
+Check database consistency:
+- food warehouse quantity never below 0
+- food locker quantity never below 0
+- student pickup cannot overdraw locker stock
+- borrowing available_quantity never below 0
+- borrowing available_quantity never above total_quantity
+- cleaning session approval still works
+- announcement visibility respects target audience
+- resources only show active links to students
+
+Check forms and validation:
+- required fields
+- negative number prevention
+- invalid dates
+- empty titles/descriptions
+- invalid URLs
+- password confirmation
+- permission-safe actions
+
+Fix only real bugs found.
+Do not redesign the whole app.
+
+==================================================
+13. EMPTY STATES AND WORDING CLEANUP
+==================================================
+
+Add or confirm empty states:
+- no food currently available in Substitute Food Locker
+- no pickup history yet
+- no announcements
+- no requests
+- no borrowing requests
+- no lounge cleaning sessions
+- no useful resources
+- no inventory history found
+- no users match this filter
+
+Clean wording:
+- Use “Substitute Food Locker” for student-facing food page.
+- Use “Useful Resources”.
+- Use “Lounge Cleaning”.
+- Use “Intl Dept. Requests” in sidebar and “Requests to International Department” as page title.
+- Use “Shared Item Borrowing”.
+- Use “Home”, not “Homepage”.
+- Avoid showing internal words like sub_food to students.
+- Avoid “program subscription” or “limited access”.
+- Keep internal code names unchanged if safer.
+
+==================================================
+14. DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Mention:
+- final sidebar label changes
+- Useful Resources management
+- targeted announcements to specific students
+- Lounge Cleaning team visibility
+- date-range cleaning workflow
+- postpone/approval workflow
+- cleaned Cleaning UI
+- cleaned Users page
+- Substitute Food Locker self-pickup if implemented
+- final manual testing checklist
+
+Add/update “Final Manual Testing Checklist” with:
+1. admin flow
+2. manager flow
+3. standard student flow
+4. substitute-food student flow
+5. announcement target audience flow
+6. useful resources flow
+7. shared item borrowing flow
+8. lounge cleaning team/task flow
+9. substitute food pickup flow
+10. permissions check
+11. regression check for food, announcements, requests, borrowing, cleaning, resources
+
+==================================================
+15. AFTER FINISHING
+==================================================
+
+After finishing, summarize:
+1. files changed
+2. schema/database changes
+3. sidebar/page label changes
+4. useful resources changes
+5. targeted announcement changes
+6. lounge cleaning workflow changes
+7. users page UI changes
+8. Substitute Food Locker checks/fixes
+9. bugs found and fixed during audit
+10. anything risky or still needing manual testing
