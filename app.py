@@ -17,6 +17,7 @@ from requests_bp import requests_bp
 from borrowing import borrowing_bp
 from cleaning import cleaning_bp
 from resources import resources_bp
+from lounge_board import lounge_board_bp
 from seed import seed_database
 
 
@@ -153,6 +154,7 @@ def create_app():
     app.register_blueprint(borrowing_bp, url_prefix="/borrowing")
     app.register_blueprint(cleaning_bp, url_prefix="/cleaning")
     app.register_blueprint(resources_bp, url_prefix="/resources")
+    app.register_blueprint(lounge_board_bp, url_prefix="/lounge-board")
 
     # ----- Root route: redirect based on role -----
     @app.route("/")

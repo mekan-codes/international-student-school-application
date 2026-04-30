@@ -336,8 +336,11 @@ class SupportRequest(db.Model):
     """
     __tablename__ = "support_requests"
 
-    CATEGORIES = ("Food", "Dormitory", "Documents", "School life",
-                  "Health", "Other")
+    # Display order matters — students see the dropdown in this order.
+    # "International Lounge" is for issues with the lounge itself
+    # (broken equipment, lost items found in the lounge, suggestions).
+    CATEGORIES = ("Food", "International Lounge", "Dormitory", "Documents",
+                  "School life", "Health", "Other")
     STATUSES = ("submitted", "in_review", "resolved", "rejected")
 
     id = db.Column(db.Integer, primary_key=True)
@@ -668,6 +671,194 @@ class CleaningTask(db.Model):
             "verified_done": "bg-success",
             "missed": "bg-danger",
         }.get(self.status, "bg-secondary")
+
+
+# =========================================================================== #
+# V4: Lounge Board — public community posts, comments, reactions              #
+# =========================================================================== #
+class LoungePost(db.Model):
+    """A public community post on the Lounge Board.
+
+    This is intentionally NOT private chat and NOT real-time — it's a
+    forum-style space where any signed-in user can post, comment, and
+    react. Authorship is captured both as a FK and as a name snapshot
+    so renames / deletes don't rewrite history.
+
+    Indexing: filtering & ordering happen in SQL (pinned DESC, then
+    created_at DESC) instead of loading every row and sorting in Python
+    — same idea as picking the right key set for an index in a data-
+    structures course.
+    """
+    __tablename__ = "lounge_posts"
+
+    CATEGORIES = ("General", "Questions", "Lost & Found", "Events",
+                  "Food", "Dormitory", "Other")
+
+    id = db.Column(db.Integer, primary_key=True)
+    author_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                               nullable=False)
+    # Snapshot of the author's name at post time (so renaming a user
+    # later doesn't rewrite history).
+    author_name = db.Column(db.String(120), nullable=False)
+
+    title = db.Column(db.String(160), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+    category = db.Column(db.String(40), nullable=False, default="General")
+
+    is_pinned = db.Column(db.Boolean, nullable=False, default=False)
+    is_locked = db.Column(db.Boolean, nullable=False, default=False)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    comments = db.relationship(
+        "LoungeComment", backref="post",
+        cascade="all, delete-orphan", order_by="LoungeComment.created_at",
+    )
+    reactions = db.relationship(
+        "LoungeReaction", backref="post",
+        cascade="all, delete-orphan",
+    )
+
+    # ----- Permission helpers (kept here so views + templates stay tidy) -----
+    def can_edit(self, user) -> bool:
+        if user is None or not user.is_authenticated:
+            return False
+        # Only the author can edit (staff have moderation = delete/pin/lock).
+        return user.id == self.author_user_id
+
+    def can_delete(self, user) -> bool:
+        if user is None or not user.is_authenticated:
+            return False
+        return user.id == self.author_user_id or user.is_staff
+
+    def can_moderate(self, user) -> bool:
+        return bool(user and user.is_authenticated and user.is_staff)
+
+    def can_comment(self, user) -> bool:
+        """Locked posts: staff may still comment; normal users cannot."""
+        if user is None or not user.is_authenticated:
+            return False
+        if not self.is_locked:
+            return True
+        return bool(user.is_staff)
+
+    # ----- Display helpers (used by templates) -----
+    @property
+    def was_edited(self) -> bool:
+        # Treat near-equal timestamps as not edited (auto-set on insert).
+        if not self.updated_at or not self.created_at:
+            return False
+        return (self.updated_at - self.created_at).total_seconds() > 1
+
+    @property
+    def content_preview(self) -> str:
+        """Short preview for the feed; full content shown on detail page."""
+        text = (self.content or "").strip()
+        if len(text) <= 220:
+            return text
+        return text[:217].rstrip() + "…"
+
+    @property
+    def category_badge_class(self) -> str:
+        # Small palette so categories are visually distinguishable on the feed.
+        return {
+            "General":      "bg-secondary",
+            "Questions":    "bg-info text-dark",
+            "Lost & Found": "bg-warning text-dark",
+            "Events":       "bg-primary",
+            "Food":         "bg-success",
+            "Dormitory":    "bg-dark",
+            "Other":        "bg-secondary",
+        }.get(self.category, "bg-secondary")
+
+    def reaction_counts(self) -> dict:
+        """{emoji: count} dict — O(n) over this post's reactions.
+        Dict (hash map) keeps the per-emoji lookup at O(1) while counting."""
+        counts = {e: 0 for e in LoungeReaction.REACTIONS}
+        for r in self.reactions:
+            counts[r.reaction_type] = counts.get(r.reaction_type, 0) + 1
+        return counts
+
+    def reaction_for(self, user) -> str | None:
+        """Which emoji the given user picked on this post, or None."""
+        if user is None or not user.is_authenticated:
+            return None
+        for r in self.reactions:
+            if r.user_id == user.id:
+                return r.reaction_type
+        return None
+
+    @property
+    def comment_count(self) -> int:
+        # Length of the already-loaded relationship — no extra query.
+        return len(self.comments)
+
+
+class LoungeComment(db.Model):
+    """A comment on a LoungePost.
+
+    Same author-snapshot pattern as LoungePost so the comment thread
+    keeps the original display name even if the user renames or is
+    later removed.
+    """
+    __tablename__ = "lounge_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("lounge_posts.id"),
+                        nullable=False)
+    author_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                               nullable=False)
+    author_name = db.Column(db.String(120), nullable=False)
+    content = db.Column(db.Text, nullable=False)
+
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    def can_edit(self, user) -> bool:
+        if user is None or not user.is_authenticated:
+            return False
+        return user.id == self.author_user_id
+
+    def can_delete(self, user) -> bool:
+        if user is None or not user.is_authenticated:
+            return False
+        return user.id == self.author_user_id or user.is_staff
+
+    @property
+    def was_edited(self) -> bool:
+        if not self.updated_at or not self.created_at:
+            return False
+        return (self.updated_at - self.created_at).total_seconds() > 1
+
+
+class LoungeReaction(db.Model):
+    """One reaction per (user, post). Picking a different emoji swaps
+    it; picking the same emoji removes it (toggle behaviour, mirroring
+    the announcement reactions for a consistent feel).
+    """
+    __tablename__ = "lounge_reactions"
+
+    REACTIONS = ("👍", "❤️", "👀")
+
+    id = db.Column(db.Integer, primary_key=True)
+    post_id = db.Column(db.Integer, db.ForeignKey("lounge_posts.id"),
+                        nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                        nullable=False)
+    reaction_type = db.Column(db.String(8), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("post_id", "user_id",
+                            name="uq_user_lounge_post_reaction"),
+    )
 
 
 # =========================================================================== #

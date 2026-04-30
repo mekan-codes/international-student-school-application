@@ -23,6 +23,7 @@ models.py         User, FoodItem, ... + V2: Announcement,
                         CleaningTeam, CleaningTeamMember,
                         CleaningSession, CleaningTask
                   + V3.1: AnnouncementRecipient (targeted DMs)
+                  + V4: LoungePost, LoungeComment, LoungeReaction
 auth.py           login (by email or student_id) / register / logout
 admin.py          admin & manager blueprint (mounted at /admin)
 student.py        student blueprint (general dashboard + food page)
@@ -40,14 +41,20 @@ cleaning.py       V3 — cleaning teams + sessions + subtask checklist
                   team-detail page with phone-privacy aware members
 resources.py      V3.1 — Resources page (curated external links;
                   visible to all signed-in users)
+lounge_board.py   V4 — community feed: posts + comments + reactions,
+                  with admin/manager pin/lock/delete moderation.
+                  Replaces former Group Chat coming-soon stub.
 seed.py           demo data
 templates/        Jinja templates (announcements/, requests/,
                   borrowing/, cleaning/, plus V3.1 resources.html
-                  and cleaning/_team_members.html)
+                  and cleaning/_team_members.html, plus V4
+                  lounge_board/{list,detail,form}.html)
 static/css/       stylesheet (V3 adds task-list, member-pill,
                   borrow-item-card, cleaning-session-card classes;
                   V3.1 adds .resource-card / .resource-icon /
-                  .team-badge-link)
+                  .team-badge-link;
+                  V4 adds .lounge-post-card / .lounge-post-pinned /
+                  .lounge-post-locked / .lounge-comment-item)
 docs/             project spec
 ```
 
@@ -63,9 +70,12 @@ You can sign in with the email or the student ID.
 ## Roles
 - **admin** — full access, can promote/demote/reset password.
 - **manager** — operational access (users, food, inventory, distributions,
-  logs); cannot touch admin/manager rows or reset passwords.
+  logs); cannot touch admin/manager rows or reset passwords. May also
+  opt in as a sub-food member (admin toggles the flag) to gain access
+  to the *Substitute Food Locker* page.
 - **student** — personal dashboard + profile. Food page only when
   `is_sub_food_member`.
+- **admins cannot** be marked as sub-food members.
 
 ## Conventions
 - Add new feature modules as **Flask blueprints** under their own file.
@@ -389,6 +399,28 @@ Routes smoke-tested while logged in (admin + S001):
 ### Settings phone input
 - Verbose helper text "Pick your country, then type your number..." replaced with a concise one-liner.
 - Country picker, formatting functionality, and privacy checkbox unchanged.
+
+## V4.1 — Small UX fixes (Apr 2026)
+
+1. **Lounge Board "View" button removed.** The redundant View button is
+   gone from the post list; the comment-count pill is now the
+   clickable affordance that opens the post (links to detail; on the
+   detail page it scrolls to `#comments`).
+2. **Managers can be sub-food members.** `member_required` accepts
+   non-admin sub-food members. Admins promoting a user no longer clear
+   the sub-food flag, and admins can toggle the sub-food flag for
+   managers. The *Substitute Food Locker* link appears in the staff
+   sidebar for managers who have the flag set.
+3. **Login flash layout fixed.** Auth pages now wrap flash messages
+   and the auth-card in an `.auth-stack` column so the alert lines up
+   above the card instead of floating off to the side.
+4. **Intl Dept. Requests gain "International Lounge" category.** Added
+   to `SupportRequest.CATEGORIES` between Food and Dormitory; templates
+   pick it up automatically.
+5. **Lounge Board pin/lock affordances clarified.** Buttons now have
+   descriptive `title=` tooltips ("Pin to top"/"Unpin", "Lock
+   comments"/"Unlock comments") and the locked badge reads
+   "Comments locked" so it's clear only commenting is restricted.
 
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a

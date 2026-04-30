@@ -74,6 +74,10 @@
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
           <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
+        <a href="{{ url_for('lounge_board.index') }}"
+           class="{% if request.blueprint == 'lounge_board' %}active{% endif %}">
+          <i class="bi bi-chat-square-text"></i> Lounge Board
+        </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
@@ -84,11 +88,14 @@
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Lounge Cleaning
         </a>
-
-        <div class="nav-section">Coming Soon</div>
-        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
-        </a>
+        {# Managers may opt in to the substitute-food program. When they
+           do, surface the same locker link the sub-food students get. #}
+        {% if current_user.is_manager and current_user.is_sub_food_member %}
+          <a href="{{ url_for('student.food') }}"
+             class="{% if request.endpoint == 'student.food' %}active{% endif %}">
+            <i class="bi bi-archive"></i> Substitute Food Locker
+          </a>
+        {% endif %}
       </nav>
     {% else %}
       {# ---- Student nav. Food links only for sub-food members. ---- #}
@@ -111,6 +118,10 @@
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
           <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
+        <a href="{{ url_for('lounge_board.index') }}"
+           class="{% if request.blueprint == 'lounge_board' %}active{% endif %}">
+          <i class="bi bi-chat-square-text"></i> Lounge Board
+        </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
@@ -127,11 +138,6 @@
             <i class="bi bi-archive"></i> Substitute Food Locker
           </a>
         {% endif %}
-
-        <div class="nav-section">Coming Soon</div>
-        <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
-          <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
-        </a>
       </nav>
     {% endif %}
 
@@ -184,12 +190,21 @@
 {% else %}
   {# Auth pages have their own simple layout #}
   <div class="auth-shell">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% for category, msg in messages %}
-        <div class="alert alert-{{ category }}">{{ msg }}</div>
-      {% endfor %}
-    {% endwith %}
-    {% block auth_content %}{% endblock %}
+    <div class="auth-stack">
+      {# Flash messages live INSIDE the centered auth column so they
+         line up with the login card instead of floating off to the
+         left as flex siblings. #}
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, msg in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show js-auto-dismiss auth-alert"
+               data-category="{{ category }}" role="alert">
+            {{ msg }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      {% endwith %}
+      {% block auth_content %}{% endblock %}
+    </div>
   </div>
 {% endif %}
 

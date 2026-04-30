@@ -236,12 +236,15 @@ def add_user():
         flash("Student ID already exists.", "danger")
         return redirect(url_for("admin.users"))
 
+    # Sub-food access is open to students AND managers (managers are
+    # often students themselves and may join the food program). It's
+    # never set on admin accounts created by other means.
     user = User(
         name=name,
         student_id=student_id or None,
         email=email,
         role=role,
-        is_sub_food_member=(is_member if role == "student" else False),
+        is_sub_food_member=(is_member if role in ("student", "manager") else False),
     )
     user.set_password(password)
     db.session.add(user)
@@ -278,6 +281,10 @@ def edit_user(user_id):
                 flash("Student ID already in use.", "danger")
                 return redirect(url_for("admin.users"))
             user.student_id = new_sid
+
+    # Sub-food access — students and managers may both have it (managers
+    # are often students too); admin accounts can't be toggled here.
+    if user.role in ("student", "manager"):
         user.is_sub_food_member = bool(request.form.get("is_sub_food_member"))
 
     db.session.commit()
@@ -289,8 +296,15 @@ def edit_user(user_id):
 @staff_required
 def toggle_member(user_id):
     user = db.session.get(User, user_id) or abort(404)
-    if user.role != "student":
-        flash("Only students can be sub-food members.", "danger")
+    # Students and managers may be sub-food members. Admins cannot.
+    if user.role not in ("student", "manager"):
+        flash("Only students and managers can be sub-food members.", "danger")
+        return redirect(url_for("admin.users"))
+    # Managers may only be toggled by admins (managers can't change other
+    # managers' membership, in line with the broader manager-can't-touch-
+    # manager rule).
+    if user.role == "manager" and not current_user.is_admin:
+        flash("Only admins can change manager memberships.", "danger")
         return redirect(url_for("admin.users"))
     ok, err = _check_can_modify(user)
     if not ok:
@@ -317,7 +331,8 @@ def promote_user(user_id):
         flash("Only students can be promoted to manager.", "danger")
         return redirect(url_for("admin.users"))
     user.role = "manager"
-    user.is_sub_food_member = False  # managers aren't part of the food program
+    # Sub-food membership is preserved across promotion: a manager who
+    # used to be a sub-food student keeps their food-program access.
     db.session.commit()
     flash(f"{user.name} is now a manager.", "success")
     return redirect(url_for("admin.users"))

@@ -27,11 +27,18 @@ def student_required(view):
 
 
 def member_required(view):
-    """Sub-food member students only."""
+    """Sub-food member access. Open to:
+       - students who are sub-food members
+       - managers who are also sub-food members (managers are often
+         students themselves and may participate in the program).
+       Admins are always redirected to their admin dashboard, since the
+       student-facing food locker isn't their workflow."""
     @wraps(view)
     @login_required
     def wrapped(*args, **kwargs):
-        if current_user.is_staff or not current_user.is_sub_food_member:
+        if current_user.is_admin:
+            return redirect(url_for("admin.dashboard"))
+        if not current_user.is_sub_food_member:
             return redirect(url_for("student.dashboard"))
         return view(*args, **kwargs)
     return wrapped

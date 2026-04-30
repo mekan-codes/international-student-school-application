@@ -273,9 +273,26 @@ a { text-decoration: none; }
   padding: 1rem;
 }
 
-.auth-card {
+/* The vertical column inside .auth-shell — contains flash messages
+   stacked above the auth card so the alert lines up with the form
+   instead of floating off to the left as a flex sibling. */
+.auth-stack {
   width: 100%;
   max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.auth-alert {
+  margin: 0;
+  border-radius: 10px;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.10);
+  font-size: 0.92rem;
+}
+
+.auth-card {
+  width: 100%;
   background: white;
   border-radius: 14px;
   padding: 2rem 2rem 1.5rem;
@@ -615,4 +632,93 @@ a { text-decoration: none; }
   background: #eef2ff !important;
   border-color: #c7d2fe !important;
   color: var(--primary-dark) !important;
+}
+
+/* =============================================================
+   V4: Lounge Board (community posts)
+   ============================================================= */
+.lounge-post-card {
+  border-left: 3px solid transparent;
+  transition: box-shadow 0.12s, border-color 0.12s, transform 0.12s;
+}
+.lounge-post-card:hover {
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+}
+.lounge-post-pinned {
+  border-left-color: #f59e0b;
+  background: #fffdf6;
+}
+.lounge-post-locked {
+  border-left-color: #94a3b8;
+  background: #f9fafb;
+}
+.lounge-post-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.lounge-post-title {
+  color: var(--text);
+  text-decoration: none;
+}
+.lounge-post-title:hover { color: var(--primary); }
+.lounge-post-preview {
+  white-space: pre-wrap;
+  line-height: 1.45;
+  margin-bottom: 0;
+}
+.lounge-post-body {
+  white-space: pre-wrap;
+  line-height: 1.55;
+  color: var(--text);
+}
+
+/* "Open / comments" pill — visually distinct from the emoji reaction
+   buttons so users see it as the way to open the post detail page
+   (it replaces the old "View" button). */
+.reaction-btn-open {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+  color: var(--primary-dark);
+  text-decoration: none;
+  font-weight: 500;
+}
+.reaction-btn-open:hover {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: white;
+}
+.reaction-btn-open:hover .reaction-count,
+.reaction-btn-open:hover .reaction-emoji { color: white; }
+.reaction-open-label {
+  margin-left: 0.25rem;
+  font-size: 0.85rem;
+}
+
+/* Comment list inside the post detail page */
+.lounge-comment-list {
+  list-style: none;
+  padding-left: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lounge-comment-item {
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fbfbfd;
+}
+.lounge-comment-meta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+.lounge-comment-body {
+  white-space: pre-wrap;
+  line-height: 1.5;
+  color: var(--text);
 }

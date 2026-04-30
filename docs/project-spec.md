@@ -6,7 +6,7 @@ International students at the school rely on shared, manually-tracked
 systems: a substitute-food program with a small warehouse and a
 daily-access locker, a cleaning rotation, borrowed equipment, and an
 informal suggestion channel. These are currently managed across
-spreadsheets, chat groups, and hallway notes — leading to lost stock,
+spreadsheets, ad-hoc chat groups, and hallway notes — leading to lost stock,
 missed cleaning shifts, and unclear membership status.
 
 The International Lounge centralizes these systems into a single
@@ -154,7 +154,7 @@ at the bottom of the sidebar (see §6.1).
 | Shareable Log     |   ✅   |    ✅   |        —         |       —      |
 | Inventory Log     |   ✅   |    ✅   |        —         |       —      |
 | Lounge Locker     |   —   |    —   |        ✅         |       —      |
-| Coming-soon × 5   |   ✅   |    ✅   |        ✅         |       ✅      |
+| Lounge Board (V4) |   ✅   |    ✅   |        ✅         |       ✅      |
 | **User chip → Settings** (footer) | ✅ | ✅ | ✅ | ✅ |
 | Logout (footer)   |   ✅   |    ✅   |        ✅         |       ✅      |
 
@@ -317,13 +317,14 @@ carry short comments naming the data structure they use and why:
 
 ## 10. Future expansion
 
-The remaining sidebar placeholder is a single "Coming soon" page:
+There are no remaining "Coming soon" placeholders. All originally planned
+modules have shipped:
 
 | Module                        | New routes               | Status |
 |-------------------------------|--------------------------|--------|
-| Common Group Chat             | `/chat/...`              | Coming soon |
 | Borrowing system              | `/borrowing/...`         | **Implemented in V3** |
 | Cleaning sessions             | `/cleaning/...`          | **Implemented in V3** |
+| Lounge Board                  | `/lounge-board/...`      | **Implemented in V4** (replaces former Group Chat placeholder) |
 
 Each module follows the same blueprint pattern as the food module.
 
@@ -645,12 +646,15 @@ subtask, which reopens the session.)
 
 ### 13.5 Sidebar reorganization
 
-The sidebar (`templates/base.html`) now has three labelled groups:
+The sidebar (`templates/base.html`) now has two labelled groups:
 
-- **Communication** — Announcements, Requests.
-- **Lounge Life** — Borrowing, Cleaning, Resources, plus food/locker
-  links.
-- **Coming Soon** — Common Group Chat (only remaining stub).
+- **Communication** — Announcements, Requests, Resources, **Lounge
+  Board** (V4).
+- **Lounge Life** — Borrowing, Cleaning, plus food/locker links.
+
+The previous *Coming Soon* group has been removed in V4 — the only
+entry it ever held (Common Group Chat) is superseded by the Lounge
+Board.
 
 Staff sidebar items previously labelled *Manage Borrowing* / *Manage
 Cleaning* are shortened to *Borrowing* / *Cleaning* — the staff role
@@ -882,3 +886,132 @@ All routes were reviewed. No functional bugs found. Key checks:
 - [ ] Cleaning sessions: schedule, mark done, approve works
 - [ ] Resources: staff add/edit/delete; students see only active
 
+
+---
+
+## 14. Version 4 — Lounge Board
+
+V4 ships a single new module — the **Lounge Board** — and removes the
+last "Coming soon" sidebar entry (*Common Group Chat*). The Lounge
+Board is a community feed: any signed-in user can publish posts,
+reply with comments, and react to posts with one of three emoji.
+Staff (admin / manager) get pin / lock / delete powers on top.
+
+### 14.1 Goals
+
+- Replace the *Group Chat* placeholder with a real community surface
+  that is in-app (no external chat tool needed).
+- Stay consistent with V2 Announcements and V3 Borrowing patterns:
+  blueprint, snapshot fields, role helpers, server-side filtering
+  and pagination.
+- Keep the role / permission model unchanged. No new role.
+
+### 14.2 Data model
+
+Three new tables (in `models.py`) reuse the existing `User` table:
+
+- **`lounge_post`** — `id`, `author_user_id` (FK, `SET NULL` so the
+  feed survives a deleted account), `author_name` (snapshot at write
+  time), `category`, `title`, `content`, `is_pinned`, `is_locked`,
+  `created_at`, `updated_at`.
+- **`lounge_comment`** — `id`, `post_id` (FK `CASCADE`),
+  `author_user_id` (FK `SET NULL`), `author_name` (snapshot),
+  `content`, `created_at`, `updated_at`.
+- **`lounge_reaction`** — `id`, `post_id` (FK `CASCADE`), `user_id`
+  (FK `CASCADE`), `reaction_type` (one of `👍 ❤️ 👀`), `created_at`,
+  with `UNIQUE(post_id, user_id)` so a user can only hold one
+  reaction per post (toggle/swap rule, enforced at the DB level).
+
+Categories are a fixed list: **General, Questions, Lost & Found,
+Events, Food, Dormitory, Other** — each gets its own coloured badge
+class via the `LoungePost.category_badge_class` helper.
+
+### 14.3 Permissions
+
+| Action                              | Author of post/comment | Other student | Admin / Manager |
+|-------------------------------------|:----------------------:|:-------------:|:---------------:|
+| Read post + comments                |           ✅           |       ✅      |        ✅       |
+| Create post                         |           —            |       ✅      |        ✅       |
+| Edit own post / comment             |           ✅           |       —      |        ✅       |
+| Delete own post / comment           |           ✅           |       —      |        ✅       |
+| React (👍 / ❤️ / 👀)                  |           ✅           |       ✅      |        ✅       |
+| Comment on a *locked* post          |           —            |       —      |        ✅       |
+| Pin / unpin any post                |           —            |       —      |        ✅       |
+| Lock / unlock any post              |           —            |       —      |        ✅       |
+| Delete *any* post / comment         |           —            |       —      |        ✅       |
+
+The helpers `LoungePost.can_edit / can_delete / can_moderate /
+can_comment` and `LoungeComment.can_edit / can_delete` encapsulate
+these rules so templates and routes share the same source of truth.
+
+### 14.4 Routes (`lounge_board.py` blueprint, `url_prefix="/lounge-board"`)
+
+| Method | Path                                | Who           | Purpose                                                               |
+|-------:|-------------------------------------|---------------|-----------------------------------------------------------------------|
+|  GET   | `/`                                 | Any logged in | Paginated feed (10/page, pinned-first), with category + search filter |
+|  GET   | `/new`                              | Any logged in | New-post form                                                         |
+|  POST  | `/new`                              | Any logged in | Create a post                                                         |
+|  GET   | `/<post_id>`                        | Any logged in | Post detail + comment thread + reaction bar                           |
+|  GET   | `/<post_id>/edit`                   | Author / staff| Edit form                                                             |
+|  POST  | `/<post_id>/edit`                   | Author / staff| Save edits                                                            |
+|  POST  | `/<post_id>/delete`                 | Author / staff| Delete a post                                                         |
+|  POST  | `/<post_id>/pin`                    | Staff         | Toggle pin                                                            |
+|  POST  | `/<post_id>/lock`                   | Staff         | Toggle lock                                                           |
+|  POST  | `/<post_id>/react`                  | Any logged in | Toggle / swap a reaction                                              |
+|  POST  | `/<post_id>/comments`               | Any logged in (staff if locked) | Add a comment                                       |
+|  POST  | `/comments/<comment_id>/edit`       | Author / staff| Save comment edit                                                     |
+|  POST  | `/comments/<comment_id>/delete`     | Author / staff| Delete a comment                                                      |
+
+All write routes are POST and redirect with a flash message. The list
+view supports `?page=`, `?category=`, and `?q=` query params; filters
+survive pagination.
+
+### 14.5 UI
+
+- New `templates/lounge_board/list.html`, `detail.html`, `form.html`.
+- Sidebar gets a **Lounge Board** entry under *Communication* for both
+  staff and students (`templates/base.html`).
+- Student dashboard's old "What's coming next → Common Group Chat"
+  card is replaced by two `info-tile` quick-links (Lounge Board and
+  Resources).
+- Reaction button styling reuses the `.reaction-btn` /
+  `.reaction-btn-active` classes already used by Announcements; new
+  `.lounge-post-card`, `.lounge-post-pinned`, `.lounge-post-locked`,
+  and `.lounge-comment-item` classes live in `static/css/style.css`.
+
+### 14.6 Removed
+
+- The *Coming Soon* sidebar group in `templates/base.html` (both the
+  staff and the student variants).
+- The "Common Group Chat" line from the student dashboard's
+  "What's coming next" card.
+- Group Chat references in `README.md` and the rest of this spec.
+
+The generic `/coming-soon/<module>` route still exists in `app.py`
+for backward-compatibility, but nothing in the UI links to it any
+more.
+
+### 14.7 Test flows
+
+#### Lounge Board basics
+- [ ] Student creates a new post → it appears at the top of the feed
+- [ ] Filter by category narrows the feed; clearing restores it
+- [ ] Search by keyword matches title or body
+- [ ] Reacting 👍 then 👍 again removes the reaction (toggle)
+- [ ] Reacting 👍 then ❤️ swaps the reaction (only one per user)
+
+#### Comments
+- [ ] Student adds, edits, and deletes own comment
+- [ ] Another student cannot edit or delete that comment
+- [ ] Admin can edit and delete any comment
+
+#### Moderation
+- [ ] Admin pins a post → it stays at the top of the feed
+- [ ] Admin locks a post → student sees the comment form replaced by
+      a "this post is locked" notice; staff can still post a comment
+- [ ] Admin deletes a post → comments and reactions are removed too
+      (FK CASCADE)
+
+#### Sidebar / docs cleanup
+- [ ] No "Group Chat" entry remains in either sidebar
+- [ ] Student dashboard shows Lounge Board card, no "coming next" list

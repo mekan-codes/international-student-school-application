@@ -96,16 +96,28 @@
   </div>
 </div>
 
-<div class="card">
-  <div class="card-body">
-    <h5 class="card-title"><i class="bi bi-stars"></i> What's coming next</h5>
-    <p class="text-muted mb-3">
-      We're rolling out more lounge features for international students.
-      Keep an eye on the sidebar:
-    </p>
-    <ul class="upcoming-list mb-0">
-      <li><i class="bi bi-chat-dots"></i> Common Group Chat</li>
-    </ul>
+<div class="row g-3">
+  <div class="col-md-6">
+    <a class="info-tile-link" href="{{ url_for('lounge_board.index') }}">
+      <div class="info-tile">
+        <i class="bi bi-chat-square-text"></i>
+        <div>
+          <strong>Lounge Board</strong>
+          <p>Chat with other students — share posts, comments, and reactions.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a class="info-tile-link" href="{{ url_for('resources.index') }}">
+      <div class="info-tile">
+        <i class="bi bi-folder2-open"></i>
+        <div>
+          <strong>Useful Resources</strong>
+          <p>Quick links to common drives and shared lounge documents.</p>
+        </div>
+      </div>
+    </a>
   </div>
 </div>
 {% endblock %}

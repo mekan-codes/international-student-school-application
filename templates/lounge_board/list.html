@@ -1,0 +1,234 @@
+{# Lounge Board feed: pinned posts first, then newest. #}
+{% extends "base.html" %}
+{% block title %}Lounge Board{% endblock %}
+
+{% block content %}
+{# ---- Header row: filters + create button ---- #}
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+      <div>
+        <h4 class="mb-1"><i class="bi bi-chat-square-text"></i> Lounge Board</h4>
+        <p class="text-muted mb-0 small">
+          A community space for international students and staff —
+          share posts, ask questions, and react to each other.
+        </p>
+      </div>
+      <a class="btn btn-primary" href="{{ url_for('lounge_board.new_post') }}">
+        <i class="bi bi-plus-lg"></i> New post
+      </a>
+    </div>
+
+    <hr class="my-3">
+
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-sm-5">
+        <label class="form-label small text-muted mb-1">Search</label>
+        <input type="text" name="q" value="{{ search_f }}"
+               class="form-control form-control-sm"
+               placeholder="Search title or content…">
+      </div>
+      <div class="col-sm-4">
+        <label class="form-label small text-muted mb-1">Category</label>
+        <select name="category" class="form-select form-select-sm">
+          <option value="">All categories</option>
+          {% for cat in categories %}
+            <option value="{{ cat }}" {% if cat == category_f %}selected{% endif %}>
+              {{ cat }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-sm-3 d-flex gap-2">
+        <button class="btn btn-sm btn-outline-primary" type="submit">
+          <i class="bi bi-funnel"></i> Filter
+        </button>
+        {% if is_filtered %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ url_for('lounge_board.index') }}">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ---- Empty state ---- #}
+{% if not posts %}
+  <div class="card">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-chat-square-text" style="font-size:2.2rem;"></i>
+      <div class="mt-2">
+        {% if is_filtered %}
+          No posts match your filter. Try a different search or category.
+        {% else %}
+          No posts yet. Be the first to start a conversation!
+        {% endif %}
+      </div>
+      {% if not is_filtered %}
+        <a class="btn btn-primary mt-3"
+           href="{{ url_for('lounge_board.new_post') }}">
+          <i class="bi bi-pencil-square"></i> Create the first post
+        </a>
+      {% endif %}
+    </div>
+  </div>
+{% else %}
+  {% for post in posts %}
+    {% set counts = post.reaction_counts() %}
+    {% set my_reaction = post.reaction_for(current_user) %}
+    <article class="card mb-3 lounge-post-card
+            {% if post.is_pinned %}lounge-post-pinned{% endif %}
+            {% if post.is_locked %}lounge-post-locked{% endif %}">
+      <div class="card-body">
+
+        {# ---- Header: author + time + badges ---- #}
+        <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+          <div class="lounge-post-meta text-muted small">
+            <i class="bi bi-person-circle"></i> {{ post.author_name }}
+            <span class="mx-1">·</span>
+            <i class="bi bi-clock"></i>
+            <time datetime="{{ post.created_at.isoformat() }}">
+              {{ post.created_at.strftime('%b %d, %Y · %H:%M') }} UTC
+            </time>
+            {% if post.was_edited %}
+              <span class="ms-1 fst-italic">(edited)</span>
+            {% endif %}
+          </div>
+          <div class="d-flex gap-1 flex-wrap">
+            {% if post.is_pinned %}
+              <span class="badge bg-warning text-dark">
+                <i class="bi bi-pin-angle-fill"></i> Pinned
+              </span>
+            {% endif %}
+            {% if post.is_locked %}
+              <span class="badge bg-secondary"
+                    title="Comments are locked for normal users">
+                <i class="bi bi-lock-fill"></i> Comments locked
+              </span>
+            {% endif %}
+            <span class="badge {{ post.category_badge_class }}">
+              {{ post.category }}
+            </span>
+          </div>
+        </div>
+
+        {# ---- Title + preview ---- #}
+        <h5 class="mt-2 mb-1">
+          <a class="lounge-post-title"
+             href="{{ url_for('lounge_board.detail', post_id=post.id) }}">
+            {{ post.title }}
+          </a>
+        </h5>
+        <p class="lounge-post-preview text-muted mb-3">
+          {{ post.content_preview }}
+        </p>
+
+        {# ---- Reactions + comments + actions ---- #}
+        <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+          <div class="reactions">
+            {% for emoji in ['👍','❤️','👀'] %}
+              <form method="post"
+                    action="{{ url_for('lounge_board.react', post_id=post.id) }}"
+                    class="d-inline">
+                <input type="hidden" name="reaction_type" value="{{ emoji }}">
+                <button class="reaction-btn
+                          {% if my_reaction == emoji %}reaction-btn-active{% endif %}"
+                        type="submit" title="React with {{ emoji }}">
+                  <span class="reaction-emoji">{{ emoji }}</span>
+                  <span class="reaction-count">{{ counts.get(emoji, 0) }}</span>
+                </button>
+              </form>
+            {% endfor %}
+            {# The comment-count pill is the canonical way to open a post.
+               It links to the detail page where comments + full body live. #}
+            <a class="reaction-btn reaction-btn-open"
+               href="{{ url_for('lounge_board.detail', post_id=post.id) }}"
+               title="Open post and view comments">
+              <span class="reaction-emoji"><i class="bi bi-chat"></i></span>
+              <span class="reaction-count">{{ post.comment_count }}</span>
+              <span class="reaction-open-label">Comments</span>
+            </a>
+          </div>
+
+          <div class="d-flex gap-2 flex-wrap">
+            {% if post.can_edit(current_user) %}
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{{ url_for('lounge_board.edit_post', post_id=post.id) }}">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            {% endif %}
+            {% if post.can_moderate(current_user) %}
+              <form method="post"
+                    action="{{ url_for('lounge_board.toggle_pin', post_id=post.id) }}"
+                    class="d-inline">
+                <button class="btn btn-sm btn-outline-warning" type="submit"
+                        title="{% if post.is_pinned %}Unpin this post (it will no longer stay at the top){% else %}Pin this post to the top{% endif %}">
+                  <i class="bi bi-pin-angle"></i>
+                  {{ "Unpin" if post.is_pinned else "Pin to top" }}
+                </button>
+              </form>
+              <form method="post"
+                    action="{{ url_for('lounge_board.toggle_lock', post_id=post.id) }}"
+                    class="d-inline">
+                <button class="btn btn-sm btn-outline-secondary" type="submit"
+                        title="{% if post.is_locked %}Unlock comments — normal users will be able to comment again{% else %}Lock comments on this post — only staff will be able to comment{% endif %}">
+                  <i class="bi bi-lock"></i>
+                  {{ "Unlock comments" if post.is_locked else "Lock comments" }}
+                </button>
+              </form>
+            {% endif %}
+            {% if post.can_delete(current_user) %}
+              <form method="post"
+                    action="{{ url_for('lounge_board.delete_post', post_id=post.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Delete this post? This cannot be undone.');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </form>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </article>
+  {% endfor %}
+
+  {# ---- Pagination ---- #}
+  {% if pagination.pages > 1 %}
+    <nav aria-label="Lounge Board pages" class="mt-3">
+      <ul class="pagination justify-content-center">
+        <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('lounge_board.index',
+                              page=pagination.prev_num,
+                              category=category_f, q=search_f) }}">
+            ‹ Prev
+          </a>
+        </li>
+        {% for p in pagination.iter_pages(left_edge=1, right_edge=1,
+                                          left_current=2, right_current=2) %}
+          {% if p %}
+            <li class="page-item {% if p == pagination.page %}active{% endif %}">
+              <a class="page-link"
+                 href="{{ url_for('lounge_board.index', page=p,
+                                  category=category_f, q=search_f) }}">
+                {{ p }}
+              </a>
+            </li>
+          {% else %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('lounge_board.index',
+                              page=pagination.next_num,
+                              category=category_f, q=search_f) }}">
+            Next ›
+          </a>
+        </li>
+      </ul>
+    </nav>
+  {% endif %}
+{% endif %}
+{% endblock %}
