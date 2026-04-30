@@ -5,39 +5,56 @@
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card">
-      <div class="card-header"><strong>Warehouse Inventory</strong></div>
-      <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0">
-          <thead>
-            <tr>
-              <th>Food</th><th>Category</th>
-              <th class="text-end">Warehouse Qty</th>
-              <th class="text-end">Adjust</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for f in items %}
-            <tr>
-              <td>{{ f.name }}</td>
-              <td><span class="badge bg-secondary">{{ f.category }}</span></td>
-              <td class="text-end fw-semibold">{{ f.warehouse_quantity }}</td>
-              <td class="text-end">
-                <form method="post" action="{{ url_for('admin.adjust_warehouse') }}"
-                      class="d-flex justify-content-end gap-1">
-                  <input type="hidden" name="food_id" value="{{ f.id }}">
-                  <input type="number" min="0" name="new_quantity"
-                         class="form-control form-control-sm"
-                         style="width: 90px" value="{{ f.warehouse_quantity }}">
-                  <button class="btn btn-sm btn-outline-primary" type="submit">Set</button>
-                </form>
-              </td>
-            </tr>
-            {% else %}
-            <tr><td colspan="4" class="text-center text-muted py-4">No food items.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <div>
+          <strong>Warehouse Inventory</strong>
+          <div class="small text-muted">
+            Edit any number, then click <em>Save changes</em>. Negatives are blocked.
+          </div>
+        </div>
       </div>
+      <form method="post" action="{{ url_for('admin.bulk_adjust_warehouse') }}">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr>
+                <th>Food</th><th>Category</th>
+                <th class="text-end">Current</th>
+                <th class="text-end">New quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for f in items %}
+              <tr>
+                <td class="fw-semibold">{{ f.name }}</td>
+                <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+                <td class="text-end text-muted">{{ f.warehouse_quantity }}</td>
+                <td class="text-end">
+                  <input type="number" min="0" step="1"
+                         name="qty_{{ f.id }}"
+                         class="form-control form-control-sm bulk-qty-input ms-auto"
+                         data-original="{{ f.warehouse_quantity }}"
+                         value="{{ f.warehouse_quantity }}">
+                </td>
+              </tr>
+              {% else %}
+              <tr><td colspan="4" class="text-center text-muted py-4">No food items.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if items %}
+        <div class="card-body border-top d-flex flex-wrap gap-2 align-items-center">
+          <input type="text" name="note" class="form-control form-control-sm flex-grow-1"
+                 style="max-width: 320px"
+                 placeholder="Optional note for these changes">
+          <span class="text-muted small me-auto" id="bulk-changes-count">No changes yet.</span>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save changes
+          </button>
+        </div>
+        {% endif %}
+      </form>
     </div>
   </div>
 
@@ -64,4 +81,27 @@
     </div>
   </div>
 </div>
+
+{% block extra_scripts %}
+{{ super() }}
+<script>
+  (function () {
+    // Live counter showing how many rows the user has changed.
+    const counter = document.getElementById('bulk-changes-count');
+    if (!counter) return;
+    const inputs = document.querySelectorAll('.bulk-qty-input');
+    const update = () => {
+      let n = 0;
+      inputs.forEach(i => {
+        if (String(i.value).trim() !== String(i.dataset.original)) n++;
+      });
+      counter.textContent = n === 0
+        ? 'No changes yet.'
+        : (n + ' row' + (n === 1 ? '' : 's') + ' will be saved.');
+      counter.classList.toggle('text-primary', n > 0);
+    };
+    inputs.forEach(i => i.addEventListener('input', update));
+  })();
+</script>
+{% endblock %}
 {% endblock %}

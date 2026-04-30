@@ -35,15 +35,21 @@ The project structure already accommodates future modules.
   toggle substitute-food membership, reset password, and a clearly
   separated *Danger zone* delete action with confirmation.
 - Food item catalog (add / edit / delete / activate) with **calories per
-  serving** and optional **serving size**. *Warehouse* and *Locker*
-  column headers — and the per-row quantity cells — are clickable
-  shortcuts to those pages.
-- Warehouse inventory (add stock, safe quantity adjustment).
-- Locker inventory (safe quantity adjustment).
+  serving**, optional **serving size**, and **initial warehouse / locker
+  quantities** captured directly in the create form. *Warehouse* and
+  *Locker* column headers — and the per-row quantity cells — are
+  clickable shortcuts to those pages.
+- **Bulk inventory editing** on the Warehouse and Locker pages — every
+  row is a number input wrapped by one form; admins/managers edit any
+  number of rows, then click *Save changes* once to persist them all
+  (one inventory log entry per changed row).
 - Stock transfer (warehouse → locker, with validation).
 - **Shareable Food Log** — record student pickups, filter by date, copy as
   plain text, export to CSV.
-- Inventory history (every change is logged).
+- **Inventory history** with date + user filters and pagination
+  (10 entries per page, with first/previous/next/last and a windowed
+  page list). Each row records remaining warehouse and locker
+  quantities at the time of the action.
 
 #### Manager features
 - Same operational surface as admin: user/food/inventory/transfer/log/
@@ -100,10 +106,19 @@ The project structure already accommodates future modules.
   is never displayed and never required. The user is expected to change it
   on next login through their profile.
 
-### Phone number privacy
+### Phone number privacy & formatting
 - Each user can store a phone number in their Settings page.
+- The phone field uses an international **country-code picker** (powered
+  by the `intl-tel-input` library, loaded from a CDN — no Python
+  dependency added). The number is formatted as you type and stored in
+  clean international format (e.g. `+82 10 1234 5678`).
 - A `show_phone_number` toggle controls visibility — when off, the number
   is stored but not displayed on directory views or other profiles.
+
+### Auto-dismissing notifications
+- Success / info messages auto-dismiss after **5 seconds**.
+- Warning / error messages auto-dismiss after **7 seconds**.
+- Users can still close any message manually with the × button.
 
 ## V1 polish notes (latest pass)
 
@@ -128,6 +143,10 @@ The project structure already accommodates future modules.
   pickup, and another `dict` when reversing one for the locker restock.
   Each helper carries a short comment that names the data structure
   and why it's used (this is a data-structures class project).
+- **"Homepage" wording.** The first sidebar link (and dashboard page
+  title) is called **Homepage** for both staff and students — the route
+  paths (`/admin/` and `/student/`) are unchanged so internal references
+  still work.
 - **Future modules.** Borrowing, Requests to International Department,
   Announcements, Common Group Chat, and Cleaning Sessions remain in
   the sidebar as **Coming soon** placeholders only — none of them are
@@ -211,19 +230,22 @@ python app.py
 Use the seeded accounts:
 
 1. **Admin** (`admin@school.com` / `admin123`)
-   - Sidebar groups: *Dashboard*, *Manage* (Users, Food Items),
+   - Sidebar starts with **Homepage**, then *Manage* (Users, Food Items),
      *Inventory* (Warehouse, Locker, Transfer Stock, Shareable Food Log,
-     Inventory History), *Coming soon* (5 placeholder items). **No
-     "My Profile" item** — click the user chip at the bottom of the
-     sidebar to open *Settings*; it should highlight on hover and stay
-     active while you are on the Settings page.
-   - Open *Users* → every row has one **Manage** button. Open it for a
-     student and try each section: edit profile, promote to manager,
-     toggle membership, reset password, delete (in the *Danger zone*).
-   - Try to delete yourself or the protected admin → blocked.
-   - On *Food Items*, add a new item with calories per serving and a
-     serving size; verify the row shows the calories column. Click
-     a *Warehouse* or *Locker* quantity → it jumps to that page.
+     Inventory History), and *Coming soon* (5 placeholders).
+   - Open *Users* → every row has one **Manage** button. Try each
+     section: edit profile, promote to manager, toggle membership,
+     reset password, delete (in the *Danger zone*).
+   - On *Food Items*, click *Add Food Item* and fill in **calories per
+     serving**, **serving size**, plus **initial warehouse / locker
+     quantities**. Save → the new row shows those quantities and *two*
+     entries appear in the inventory history.
+   - On *Warehouse* (or *Locker*): change a few of the row inputs, then
+     click **Save changes** once. A success toast lists each row's
+     before→after value and auto-dismisses after ~5 seconds. Save again
+     without changes → "No changes to save."
+   - On *Inventory History*: filter by date and/or user, walk through
+     the *Previous / 1 2 3 / Next* pagination, then click *Clear*.
    - Visit `/profile` directly → 301 redirect to `/settings`.
 
 2. **Manager** (`manager@school.com` / `manager123`)
@@ -239,19 +261,20 @@ Use the seeded accounts:
      logs.
 
 3. **Sub-food student** (`student1@school.com` / `student123`)
-   - Sidebar shows *My Dashboard*, *Lounge Locker*, and the coming-soon
-     items — **no "My Profile" item**. The user chip at the bottom is
-     the way into *Settings*. No role label appears anywhere.
+   - Sidebar shows *Homepage*, *Lounge Locker*, and the coming-soon
+     items — no "My Profile" item. The user chip at the bottom is the
+     way into *Settings*. No role label appears anywhere.
    - *Lounge Locker* lists items in stock with calories per serving and
      serving size when set, or "Calories not listed" otherwise. There
      is no internal "membership" wording on the page.
-   - Settings shows only name, student ID, email, and phone number;
-     password change requires current + new + confirm.
+   - On *Settings*, click the country flag to pick (e.g.) Korea (+82),
+     type a number — it formats as you type. Save → the page header
+     toast disappears on its own after a few seconds.
 
 4. **Standard student** (`student2@school.com` / `student123`)
-   - Sidebar shows *My Dashboard* and the coming-soon items only —
-     **no food link, no "My Profile" link**. The user chip at the bottom
-     is the entry to *Settings*.
+   - Sidebar shows *Homepage* and the coming-soon items only — no food
+     link, no "My Profile" link. The user chip at the bottom is the
+     entry to *Settings*.
    - Direct visit to `/student/food` silently redirects back to the
      dashboard.
    - Dashboard never mentions roles, programs, membership, or limits;

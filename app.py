@@ -46,6 +46,17 @@ def _migrate_schema() -> None:
                 "ALTER TABLE food_items ADD COLUMN serving_size VARCHAR(60)"
             )
 
+    if "inventory_logs" in table_names:
+        log_cols = {c["name"] for c in inspector.get_columns("inventory_logs")}
+        if "warehouse_qty_after" not in log_cols:
+            statements.append(
+                "ALTER TABLE inventory_logs ADD COLUMN warehouse_qty_after INTEGER"
+            )
+        if "locker_qty_after" not in log_cols:
+            statements.append(
+                "ALTER TABLE inventory_logs ADD COLUMN locker_qty_after INTEGER"
+            )
+
     if not statements:
         return
     with db.engine.begin() as conn:
