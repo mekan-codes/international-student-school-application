@@ -745,3 +745,140 @@ and the `Start application` workflow.
 | Table | Change |
 |-------|--------|
 | `resources` | New table (created by `db.create_all()`) |
+
+## V3.3 — Substitute Food Locker & Stability Audit (Apr 2026)
+
+### 1. Rename: Lounge Locker → Substitute Food Locker
+- Student-facing sidebar label changed to **Substitute Food Locker**.
+- Page title, card header, and description text updated to match.
+- Internal route (`/student/food`), function name (`food()`), and template path
+  remain unchanged to avoid risky refactors.
+
+### 2. Student self-pickup from Substitute Food Locker
+Route: `POST /student/food` — protected by `@member_required` (sub-food
+members only; standard students and staff are blocked).
+
+**Flow:**
+1. Student submits the pickup form (list of food_id[] + quantity[] pairs).
+2. Server validates: at least one item, quantity ≥ 1, no overdraw.
+3. A single `Distribution` record is created with
+   `source_type = "student_self_pickup"` (the student's own user is recorded
+   in `performed_by_user_id` / `performed_by_user_name`).
+4. One `DistributionItem` row per food; `locker_quantity` decremented.
+5. One `InventoryLog` row per food (`action_type = "distribute_to_student"`).
+6. Flash message: "You took Chicken Mayo × 1, Noodles × 1."
+
+**Grouped pickup logging:** because all foods in one form submission share one
+`Distribution` row, the shareable food log shows them as a single line, e.g.:
+`Apr 30, 2026 | Mekan | Chicken Mayo: 1, Noodles: 1, Rice: 1`
+
+### 3. Recently taken by me
+Bottom section on Substitute Food Locker page shows this student's last 5
+`Distribution` rows (filtered by `student_id = current_user.id`).
+Display: date/time + badges per food item.
+Empty state: "No pickup history yet."
+
+### 4. Source label on admin Shareable Food Log
+`Distribution.source_type` field added (nullable VARCHAR(30), default
+`staff_recorded`).
+
+| source_type | Display badge |
+|---|---|
+| `staff_recorded` | Staff recorded (grey) |
+| `student_self_pickup` | Student pickup (info/teal) |
+
+Admin additive migration runs on startup via `_migrate_schema()` (ALTER TABLE).
+
+### 5. Schema change summary
+
+| Table | Change |
+|---|---|
+| `distributions` | New column `source_type VARCHAR(30) DEFAULT 'staff_recorded'` |
+
+No other schema changes needed.
+
+### 6. Stability & permissions audit findings
+
+All routes were reviewed. No functional bugs found. Key checks:
+
+| Check | Result |
+|---|---|
+| Students blocked from all `/admin/*` routes | ✅ `@staff_required` |
+| Standard students blocked from `/student/food` | ✅ `@member_required` |
+| Managers blocked from admin-only actions | ✅ `@admin_required` on promote/demote/reset-pw |
+| Last admin cannot be deleted/demoted | ✅ `_admin_count()` guard |
+| Protected accounts cannot be edited | ✅ `is_protected` guard |
+| Locker overdraw prevented | ✅ Both admin.py and student.py |
+| Warehouse overdraw prevented | ✅ admin.py transfer route |
+| Borrowing available_quantity ≥ 0 | ✅ approve route guard |
+| Announcement audience filters | ✅ SQL-level filter in `Announcement.visible_to()` |
+| Resources: students see only active | ✅ resources.py filters `is_active=True` |
+
+### 7. Final Manual Testing Checklist
+
+#### Admin flow
+- [ ] Login as admin@school.com / admin123
+- [ ] Dashboard shows totals and low-stock alerts
+- [ ] Add/edit/delete a food item
+- [ ] Adjust warehouse and locker quantities
+- [ ] Transfer stock from warehouse to locker
+- [ ] Record a staff pickup on Shareable Food Log → verify "Staff recorded" badge
+- [ ] Export CSV; verify all columns present
+- [ ] Add an announcement to all students; verify it appears for students
+- [ ] View/respond to a support request
+- [ ] Manage a cleaning session: create, assign tasks, approve
+
+#### Manager flow
+- [ ] Login as manager@school.com / manager123
+- [ ] Can access food items, warehouse, distributions, announcements
+- [ ] Cannot promote/demote users or reset passwords (gets 403)
+- [ ] Cannot modify protected accounts
+
+#### Standard student flow
+- [ ] Login as student1@school.com / student123
+- [ ] Sidebar shows: Homepage, Announcements, Requests, Resources, Borrowing, Cleaning
+- [ ] No Substitute Food Locker link visible
+- [ ] Navigating to /student/food redirects to student dashboard
+- [ ] Can submit a support request and view own requests only
+- [ ] Can submit a borrow request
+
+#### Sub-food student flow
+- [ ] Create or use a sub-food member account (is_sub_food_member=True)
+- [ ] Sidebar shows Substitute Food Locker under Lounge Life
+- [ ] Can view available food in the locker table
+- [ ] Can pick up food via the form (enter qty, click Take selected food, confirm)
+- [ ] Cannot take more than available quantity (error shown)
+- [ ] Cannot take 0 or negative (button remains disabled; JS + server guard)
+- [ ] Success flash message shows all items taken
+- [ ] "Recently taken by me" section shows the new pickup row
+
+#### Student food pickup flow
+- [ ] Submit pickup → locker_quantity decreases for each food
+- [ ] Admin Shareable Food Log shows the pickup as one grouped row
+- [ ] Source badge shows "Student pickup" (teal)
+- [ ] Inventory History shows "distribute_to_student" entries for each food
+- [ ] "Recently taken by me" shows pickup within last 5
+
+#### Shareable Food Log verification
+- [ ] Date | Student | Items format rendered in the plain-text textarea
+- [ ] Staff pickups show "Staff recorded" badge
+- [ ] Student self-pickups show "Student pickup" badge
+- [ ] CSV export includes all distributions (both sources)
+
+#### Inventory History verification
+- [ ] Student pickup creates one InventoryLog row per food
+- [ ] `action_type = distribute_to_student` for student pickups
+- [ ] `locker_qty_after` and `warehouse_qty_after` snapshots are correct
+
+#### Permissions check
+- [ ] /admin/* routes return 403 when accessed by students
+- [ ] /student/food redirects standard students to dashboard
+- [ ] Managers cannot access admin-only actions
+
+#### Regression check
+- [ ] Announcements post, publish, react, and filter correctly
+- [ ] Support requests submit, update status, and show response
+- [ ] Borrowing: approve and return flow restores available_quantity
+- [ ] Cleaning sessions: schedule, mark done, approve works
+- [ ] Resources: staff add/edit/delete; students see only active
+

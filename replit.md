@@ -332,6 +332,40 @@ Routes smoke-tested while logged in (admin + S001):
 - Staff "Manage" section renamed "Management".
 - Student "Lounge Locker" moved inside **Lounge Life** section.
 
+## V3.3 — Substitute Food Locker & Stability Audit (Apr 2026)
+
+### Rename: Lounge Locker → Substitute Food Locker
+- Student sidebar label, page title, and card header updated.
+- Internal route/function names unchanged (`/student/food`, `food()`).
+
+### Student self-pickup
+- `POST /student/food` — `@member_required` (sub-food members only).
+- Validates qty ≥ 1 and no overdraw against `locker_quantity`.
+- Creates one grouped `Distribution` + one `DistributionItem` per food.
+- Creates one `InventoryLog` entry per food (action_type = distribute_to_student).
+- `source_type = "student_self_pickup"` on the Distribution record.
+- JS confirmation dialog before submission; "Take selected food" button disabled until qty > 0.
+- Success flash: "You took Chicken Mayo × 1, Noodles × 1."
+
+### Recently taken by me
+- Last 5 `Distribution` rows for the current student shown below the form.
+- Empty state: "No pickup history yet."
+
+### Source label on admin Shareable Food Log
+- New `source_type` column on the `distributions` table.
+- Admin table shows "Staff recorded" (grey) vs "Student pickup" (teal) badge.
+- Additive migration in `_migrate_schema()` — runs automatically on startup.
+
+### Schema change
+| Table | Column added |
+|---|---|
+| `distributions` | `source_type VARCHAR(30) DEFAULT 'staff_recorded'` |
+
+### Stability audit
+- All permission decorators verified: `@staff_required`, `@admin_required`, `@member_required`.
+- Last-admin guard, protected-account guard, and overdraw guards all confirmed present.
+- No bugs found.
+
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a
 dev-only string when unset.

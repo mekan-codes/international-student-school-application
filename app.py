@@ -86,6 +86,15 @@ def _migrate_schema() -> None:
         if "approved_by_name" not in sess_cols:
             statements.append("ALTER TABLE cleaning_sessions ADD COLUMN approved_by_name VARCHAR(120)")
 
+    # V3.3: source_type on distributions table (student self-pickup tracking).
+    if "distributions" in table_names:
+        dist_cols = {c["name"] for c in inspector.get_columns("distributions")}
+        if "source_type" not in dist_cols:
+            statements.append(
+                "ALTER TABLE distributions ADD COLUMN source_type VARCHAR(30) "
+                "DEFAULT 'staff_recorded'"
+            )
+
     if not statements:
         return
     with db.engine.begin() as conn:

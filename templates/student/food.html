@@ -1,61 +1,182 @@
 {% extends "base.html" %}
-{% block title %}Lounge Locker{% endblock %}
+{% block title %}Substitute Food Locker{% endblock %}
 
 {% block content %}
+{# ---- Page header ---- #}
 <div class="card mb-4">
   <div class="card-body">
-    <h4 class="mb-1"><i class="bi bi-archive"></i> Available in the lounge locker</h4>
+    <h4 class="mb-1"><i class="bi bi-archive"></i> Substitute Food Locker</h4>
     <p class="text-muted mb-0">
-      Read-only view of what's currently in the lounge locker.
-      Pickups are recorded by lounge staff.
+      Select the food you want to take and click <strong>Take selected food</strong>.
+      Each pickup is logged and visible to lounge staff.
     </p>
   </div>
 </div>
 
-{% if locker_items %}
-<div class="row g-3">
-  {% for f in locker_items %}
-  <div class="col-sm-6 col-lg-4">
-    <div class="card food-card h-100">
-      <div class="card-body">
-        <div class="d-flex justify-content-between align-items-start">
-          <h5 class="card-title mb-1">{{ f.name }}</h5>
-          <span class="badge bg-secondary">{{ f.category }}</span>
-        </div>
-        <p class="text-muted small mb-3">In locker</p>
-        <div class="qty-row">
-          <span class="qty">{{ f.locker_quantity }}</span>
-          <span class="qty-label">available</span>
-        </div>
-        <hr class="my-3">
-        <div class="small">
-          {% if f.calories_per_serving is not none %}
-            <div>
-              <i class="bi bi-fire text-warning"></i>
-              <strong>{{ f.calories_per_serving }}</strong> kcal / serving
-            </div>
-          {% else %}
-            <div class="text-muted">
-              <i class="bi bi-fire"></i> Calories not listed
-            </div>
-          {% endif %}
-          {% if f.serving_size %}
-            <div class="text-muted">
-              <i class="bi bi-cup-straw"></i> Serving: {{ f.serving_size }}
-            </div>
-          {% endif %}
-        </div>
-      </div>
+{# ---- Flash messages ---- #}
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for cat, msg in messages %}
+    <div class="alert alert-{{ cat }} alert-dismissible fade show" role="alert">
+      {{ msg }}
+      <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     </div>
-  </div>
   {% endfor %}
+{% endwith %}
+
+{# ---- Pickup form ---- #}
+{% if locker_items %}
+<div class="card mb-4">
+  <div class="card-header"><strong>Available now</strong></div>
+  <form method="post" id="pickupForm">
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Food</th>
+            <th>Category</th>
+            <th class="text-end">In locker</th>
+            <th style="width: 130px">Qty to take</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for f in locker_items %}
+          <tr>
+            <td>
+              <strong>{{ f.name }}</strong>
+              {% if f.calories_per_serving %}
+                <div class="small text-muted">
+                  <i class="bi bi-fire text-warning"></i>
+                  {{ f.calories_per_serving }} kcal
+                  {% if f.serving_size %}/ {{ f.serving_size }}{% endif %}
+                </div>
+              {% endif %}
+            </td>
+            <td><span class="badge bg-secondary">{{ f.category }}</span></td>
+            <td class="text-end">
+              <span class="fw-bold {% if f.locker_quantity <= 3 %}text-danger{% endif %}">
+                {{ f.locker_quantity }}
+              </span>
+            </td>
+            <td>
+              <input type="hidden" name="food_id[]" value="{{ f.id }}">
+              <input
+                type="number"
+                name="quantity[]"
+                class="form-control form-control-sm qty-input"
+                min="0"
+                max="{{ f.locker_quantity }}"
+                value="0"
+                data-max="{{ f.locker_quantity }}"
+                data-name="{{ f.name }}"
+              >
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex justify-content-end">
+      <button type="submit" class="btn btn-primary" id="takeBtn" disabled>
+        <i class="bi bi-bag-check"></i> Take selected food
+      </button>
+    </div>
+  </form>
 </div>
 {% else %}
-<div class="card">
+<div class="card mb-4">
   <div class="card-body text-center text-muted py-5">
     <i class="bi bi-archive" style="font-size: 2rem;"></i>
-    <p class="mt-2 mb-0">There is currently no food in the locker.</p>
+    <p class="mt-2 mb-0">There is currently no food available in the locker. Check back soon.</p>
   </div>
 </div>
 {% endif %}
+
+{# ---- Recently taken by me ---- #}
+<div class="card">
+  <div class="card-header">
+    <strong><i class="bi bi-clock-history"></i> Recently taken by me</strong>
+  </div>
+  {% if recent_pickups %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Date &amp; time</th>
+            <th>Items taken</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for d in recent_pickups %}
+          <tr>
+            <td class="text-nowrap text-muted small">
+              {{ d.timestamp.strftime('%b %d, %Y') }}<br>
+              {{ d.timestamp.strftime('%H:%M') }}
+            </td>
+            <td>
+              {% for i in d.items %}
+                <span class="badge bg-light text-dark border me-1 mb-1">
+                  {{ i.food_name }}: {{ i.quantity }}
+                </span>
+              {% endfor %}
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <div class="card-body text-center text-muted py-4">
+      No pickup history yet.
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const form = document.getElementById("pickupForm");
+  if (!form) return;
+
+  const takeBtn = document.getElementById("takeBtn");
+  const inputs = form.querySelectorAll(".qty-input");
+
+  function updateButton() {
+    const anySelected = Array.from(inputs).some(el => parseInt(el.value, 10) > 0);
+    takeBtn.disabled = !anySelected;
+  }
+
+  inputs.forEach(el => el.addEventListener("input", updateButton));
+
+  form.addEventListener("submit", function (e) {
+    const lines = [];
+    let valid = true;
+
+    inputs.forEach(el => {
+      const qty = parseInt(el.value, 10);
+      if (qty > 0) {
+        const max = parseInt(el.dataset.max, 10);
+        if (qty > max) {
+          alert(`Only ${max} available for ${el.dataset.name}.`);
+          valid = false;
+        } else {
+          lines.push(`${el.dataset.name} \u00d7 ${qty}`);
+        }
+      }
+    });
+
+    if (!valid) { e.preventDefault(); return; }
+    if (lines.length === 0) {
+      alert("Please select at least one food item.");
+      e.preventDefault();
+      return;
+    }
+
+    const ok = confirm(
+      `Confirm pickup:\n\n${lines.join("\n")}\n\nClick OK to confirm.`
+    );
+    if (!ok) e.preventDefault();
+  });
+})();
+</script>
 {% endblock %}
