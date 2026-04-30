@@ -2,6 +2,9 @@
 {% block title %}Settings{% endblock %}
 
 {% block content %}
+<link rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/css/intlTelInput.min.css">
+
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card mb-3">
@@ -9,7 +12,7 @@
         <strong><i class="bi bi-person-gear"></i> Profile information</strong>
       </div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('profile.settings') }}">
+        <form method="post" action="{{ url_for('profile.settings') }}" id="profile-form">
           <div class="mb-3">
             <label class="form-label">Full name</label>
             <input class="form-control" name="name" value="{{ current_user.name }}" required>
@@ -21,10 +24,21 @@
           </div>
 
           <div class="mb-3">
-            <label class="form-label">Phone number <span class="text-muted small">(optional)</span></label>
-            <input class="form-control" type="tel" name="phone_number"
+            <label class="form-label" for="phone-input">
+              Phone number <span class="text-muted small">(optional)</span>
+            </label>
+            <input class="form-control" type="tel" id="phone-input"
                    value="{{ current_user.phone_number or '' }}"
-                   placeholder="+1 555 123 4567">
+                   placeholder="Phone number"
+                   autocomplete="tel">
+            {# Hidden input — populated from intl-tel-input on submit so we
+               always store a clean international (E.164) value. #}
+            <input type="hidden" name="phone_number" id="phone-hidden"
+                   value="{{ current_user.phone_number or '' }}">
+            <div class="form-text" id="phone-hint">
+              Pick your country, then type your number — it will format itself
+              and be stored in international format (e.g. <code>+82 10‑1234‑5678</code>).
+            </div>
             <div class="form-check mt-2">
               <input class="form-check-input" type="checkbox"
                      id="showPhone" name="show_phone_number"
@@ -130,4 +144,66 @@
     </div>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+{{ super() }}
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/intlTelInput.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/utils.js"></script>
+<script>
+  (function () {
+    const input = document.getElementById('phone-input');
+    const hidden = document.getElementById('phone-hidden');
+    const hint = document.getElementById('phone-hint');
+    const form = document.getElementById('profile-form');
+    if (!input || !window.intlTelInput) return;
+
+    const iti = window.intlTelInput(input, {
+      initialCountry: 'auto',
+      geoIpLookup: function (success) {
+        // Best-effort country guess; falls back to KR (school context).
+        fetch('https://ipapi.co/json/')
+          .then(r => r.json())
+          .then(d => success((d && d.country_code) || 'kr'))
+          .catch(() => success('kr'));
+      },
+      separateDialCode: true,
+      formatAsYouType: true,
+      nationalMode: false,
+      utilsScript: 'https://cdn.jsdelivr.net/npm/intl-tel-input@23.0.12/build/js/utils.js',
+    });
+
+    // Live validation hint.
+    function validate() {
+      if (!input.value.trim()) {
+        hint.classList.remove('text-danger', 'text-success');
+        return;
+      }
+      const ok = iti.isValidNumber();
+      hint.classList.toggle('text-danger', !ok);
+      hint.classList.toggle('text-success', ok);
+    }
+    input.addEventListener('blur', validate);
+    input.addEventListener('countrychange', validate);
+
+    // On submit: write the canonical international value into the hidden
+    // input. If the number is empty, store empty so the server clears it.
+    form.addEventListener('submit', function () {
+      const raw = input.value.trim();
+      if (!raw) { hidden.value = ''; return; }
+      try {
+        if (iti.isValidNumber()) {
+          // E.164 (e.g. +821012345678) plus a separator-friendly intl format.
+          hidden.value = iti.getNumber(intlTelInputUtils.numberFormat.INTERNATIONAL);
+        } else {
+          // Fall back to whatever the user typed (server still stores it,
+          // but the format may be irregular).
+          hidden.value = raw;
+        }
+      } catch (e) {
+        hidden.value = raw;
+      }
+    });
+  })();
+</script>
 {% endblock %}

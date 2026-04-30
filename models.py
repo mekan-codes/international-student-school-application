@@ -107,6 +107,10 @@ class InventoryLog(db.Model):
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     note = db.Column(db.String(255), nullable=True)
 
+    # Snapshot of stock immediately AFTER the action (nullable for old rows).
+    warehouse_qty_after = db.Column(db.Integer, nullable=True)
+    locker_qty_after = db.Column(db.Integer, nullable=True)
+
 
 class Distribution(db.Model):
     """A single 'pickup' event: one student takes one or more foods at once."""

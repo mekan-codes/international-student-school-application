@@ -172,6 +172,20 @@ single `<a>` element pointing to `/settings`:
 This pattern intentionally replaces the previous separate "My Profile"
 sidebar item — keeping the navigation list focused on real modules.
 
+## 6.5 Inventory log row (`inventory_logs`)
+
+In addition to the existing fields, every new log row stores the
+**post-action** stock snapshot for the affected food item:
+
+| Column                | Type    | Notes                                  |
+|-----------------------|---------|----------------------------------------|
+| **warehouse_qty_after** | INTEGER | nullable for rows written before V1 polish |
+| **locker_qty_after**    | INTEGER | nullable for rows written before V1 polish |
+
+`_log_action(...)` reads these from the FoodItem after callers have
+applied the mutation, which is why **callers must mutate the FoodItem
+before calling `_log_action`**.
+
 ## 7. Food Items page UX
 
 The page shows one row per food item with a clean layout:
@@ -189,6 +203,37 @@ The page shows one row per food item with a clean layout:
 - The Add and Edit modals expose Name, Category, **Calories per serving**
   (optional), **Serving size** (optional), Low-stock threshold, and
   the active/inactive toggle.
+- The Add modal also captures **initial warehouse quantity** and
+  **initial locker quantity** (both default to 0, must be ≥ 0). Each
+  non-zero starting amount is recorded in the inventory history with
+  the note `Initial stock on creation`.
+
+### Warehouse / Locker bulk editing
+
+- Both pages render every row as a single `<form>` with one numeric
+  input per row (`name="qty_<food_id>"`).
+- One **Save changes** button at the bottom posts the entire form to
+  `/admin/warehouse/bulk-adjust` or `/admin/locker/bulk-adjust`.
+- The handler validates each value as a non-negative integer, then
+  applies only the rows whose value actually changed and writes one
+  inventory-log entry per change.
+- If nothing changed, the user sees a `No changes to save.` toast.
+- A small live counter under the table shows how many rows will be
+  saved before submission.
+- The single-row endpoints (`/admin/warehouse/adjust` and
+  `/admin/locker/adjust`) are kept for backward compatibility but the
+  UI no longer surfaces them.
+
+### Inventory History
+
+- Filters: **date** (single calendar day) and **user** (dropdown of
+  every user who has ever produced a log entry). They combine with AND.
+- A *Clear* link resets to "all logs".
+- Pagination: 10 rows per page (`PAGE_SIZE`). Renders « First, Previous,
+  windowed page list with `…` ellipses around the current page, Next,
+  » Last. Page links keep the current filter querystring.
+- Columns: Time, User, Action, Food, Qty, From → To, **Wh after**,
+  **Lk after**, Note.
 
 ## 8. Users page UX
 

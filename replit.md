@@ -57,6 +57,23 @@ You can sign in with the email or the student ID.
   permission gating; use `is_admin` for admin-only paths.
 
 ## Recent changes
+- **Phone formatting** in Settings now uses `intl-tel-input` (CDN, no
+  Python dep) — country dropdown, format-as-you-type, stored in
+  international format. A hidden field carries the canonical value.
+- **"My Dashboard" → "Homepage"** for both staff and students. Routes
+  unchanged.
+- **Auto-dismiss flash messages**: success/info 5 s, warning/danger 7 s.
+  Manual close still works.
+- **Bulk warehouse / locker editing**: one Save changes button replaces
+  per-row Set buttons; only changed rows are persisted; "No changes to
+  save" when nothing differs; one inventory log entry per change.
+- **Initial quantities on food creation**: `initial_warehouse_quantity`
+  and `initial_locker_quantity` fields, validated non-negative,
+  recorded as inventory log entries.
+- **Inventory History** has date + user filters, 10 entries per page,
+  and standard pagination (« Previous 1 2 … 9 Next »). Each row shows
+  the post-action warehouse and locker quantities (new
+  `warehouse_qty_after` / `locker_qty_after` columns; old rows show —).
 - **V1 polish pass**: removed standalone "My Profile" sidebar item;
   the bottom user chip is now a clickable link to `/settings` with
   hover/active styling. Profile page renamed to **Settings**;

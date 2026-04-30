@@ -1,22 +1,61 @@
 {% extends "base.html" %}
-{% block title %}Inventory Logs{% endblock %}
+{% block title %}Inventory History{% endblock %}
 
 {% block content %}
+<div class="card mb-3 logs-filter-card">
+  <div class="card-body">
+    <form method="get" action="{{ url_for('admin.logs') }}"
+          class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Date</label>
+        <input type="date" name="date" class="form-control"
+               value="{{ filter_date }}">
+      </div>
+      <div class="col-md-4">
+        <label class="form-label">User</label>
+        <select name="user_id" class="form-select">
+          <option value="">All users</option>
+          {% for uid, uname in actors %}
+            <option value="{{ uid }}"
+              {% if filter_user_id == uid|string %}selected{% endif %}>
+              {{ uname }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4 d-flex gap-2">
+        <button type="submit" class="btn btn-primary">
+          <i class="bi bi-funnel"></i> Apply
+        </button>
+        <a href="{{ url_for('admin.logs') }}" class="btn btn-outline-secondary">
+          Clear
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="card">
-  <div class="card-header">
+  <div class="card-header d-flex justify-content-between align-items-center">
     <strong>Inventory History</strong>
-    <span class="text-muted small">— newest first, last 500 entries</span>
+    <span class="text-muted small">
+      {{ total }} entr{{ 'y' if total == 1 else 'ies' }}
+      {% if filter_date or filter_user_id %} (filtered){% endif %}
+      · page {{ page }} of {{ last_page }}
+    </span>
   </div>
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
           <th>Time</th>
-          <th>Food</th>
+          <th>User</th>
           <th>Action</th>
+          <th>Food</th>
           <th class="text-end">Qty</th>
           <th>From → To</th>
-          <th>By</th>
+          <th class="text-end">Wh after</th>
+          <th class="text-end">Lk after</th>
           <th>Note</th>
         </tr>
       </thead>
@@ -24,28 +63,88 @@
         {% for l in logs %}
         <tr>
           <td class="text-nowrap"><small>{{ l.timestamp.strftime('%Y-%m-%d %H:%M') }}</small></td>
-          <td>{{ l.food_name }}</td>
+          <td><small>{{ l.performed_by_user_name }}</small></td>
           <td>
             {% set color = {
               'add_to_warehouse': 'success',
               'transfer_to_locker': 'primary',
               'adjust_warehouse': 'secondary',
-              'adjust_locker': 'secondary'
+              'adjust_locker': 'secondary',
+              'distribute_to_student': 'info',
             }.get(l.action_type, 'secondary') %}
             <span class="badge bg-{{ color }}">{{ l.action_type.replace('_', ' ') }}</span>
           </td>
-          <td class="text-end">{{ l.quantity }}</td>
+          <td>{{ l.food_name }}</td>
+          <td class="text-end {% if l.quantity < 0 %}text-danger{% endif %}">
+            {{ l.quantity }}
+          </td>
           <td>
             <small>{{ l.source_location or '—' }} → {{ l.destination_location or '—' }}</small>
           </td>
-          <td><small>{{ l.performed_by_user_name }}</small></td>
+          <td class="text-end">
+            <small>{{ l.warehouse_qty_after if l.warehouse_qty_after is not none else '—' }}</small>
+          </td>
+          <td class="text-end">
+            <small>{{ l.locker_qty_after if l.locker_qty_after is not none else '—' }}</small>
+          </td>
           <td><small class="text-muted">{{ l.note or '' }}</small></td>
         </tr>
         {% else %}
-        <tr><td colspan="7" class="text-center text-muted py-4">No history yet.</td></tr>
+        <tr><td colspan="9" class="text-center text-muted py-4">
+          {% if filter_date or filter_user_id %}
+            No history matches those filters.
+          {% else %}
+            No history yet.
+          {% endif %}
+        </td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+
+  {% if last_page > 1 %}
+  <div class="card-footer">
+    {% set base_args = {} %}
+    {% if filter_date %}{% set _ = base_args.update({'date': filter_date}) %}{% endif %}
+    {% if filter_user_id %}{% set _ = base_args.update({'user_id': filter_user_id}) %}{% endif %}
+
+    <nav aria-label="Inventory history pagination">
+      <ul class="pagination justify-content-center mb-0">
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('admin.logs', page=1, **base_args) }}"
+             title="First">«</a>
+        </li>
+        <li class="page-item {% if page == 1 %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('admin.logs', page=page-1, **base_args) }}">
+            Previous
+          </a>
+        </li>
+        {% for p in page_window %}
+          {% if p == '…' %}
+            <li class="page-item disabled"><span class="page-link">…</span></li>
+          {% else %}
+            <li class="page-item {% if p == page %}active{% endif %}">
+              <a class="page-link"
+                 href="{{ url_for('admin.logs', page=p, **base_args) }}">{{ p }}</a>
+            </li>
+          {% endif %}
+        {% endfor %}
+        <li class="page-item {% if page == last_page %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('admin.logs', page=page+1, **base_args) }}">
+            Next
+          </a>
+        </li>
+        <li class="page-item {% if page == last_page %}disabled{% endif %}">
+          <a class="page-link"
+             href="{{ url_for('admin.logs', page=last_page, **base_args) }}"
+             title="Last">»</a>
+        </li>
+      </ul>
+    </nav>
+  </div>
+  {% endif %}
 </div>
 {% endblock %}

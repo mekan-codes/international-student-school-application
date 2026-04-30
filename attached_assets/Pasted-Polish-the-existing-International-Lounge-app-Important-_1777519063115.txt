@@ -1,0 +1,143 @@
+Polish the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Keep the app runnable.
+- Focus on UX fixes, phone formatting, inventory editing, food creation, toast messages, and history filtering/pagination.
+
+Tasks:
+
+1. Phone number input formatting
+Improve the phone number input in Settings/Profile.
+
+Add automatic phone number formatting and country code support:
+- Detect/format international phone numbers.
+- Support country code like +82, +1, etc.
+- Format spacing/indentation naturally as the user types.
+- Validate phone numbers where possible.
+- Store the phone number in a clean international format.
+- If possible, use a reliable library such as libphonenumber-js or react-phone-number-input.
+- Keep show_phone_number privacy option.
+
+Example:
+Input like Korean number should display naturally with +82 formatting.
+
+2. Rename “My Dashboard”
+Change sidebar/menu text:
+- Replace “My Dashboard” with “Homepage”
+- Use this wording consistently for student/admin/manager if appropriate.
+- Keep route working even if route name is still /dashboard internally.
+
+3. Auto-dismiss success/error messages
+Currently messages like “Your settings have been updated.” stay visible.
+
+Change toast/alert behavior:
+- Success messages disappear automatically after 5 seconds.
+- Error messages may also disappear after 5–7 seconds unless critical.
+- User should still be able to close them manually with X.
+- Apply this globally where possible, not only Settings.
+
+4. Improve warehouse/locker quantity editing
+Currently each food row has its own quantity input and Set button.
+
+Change this UX:
+- Remove individual Set buttons per row.
+- Admin/manager can edit multiple food quantities on the page.
+- Add one main “Save changes” button.
+- When clicked, save all changed quantities at once.
+- Show which quantities changed if easy.
+- Prevent negative quantities.
+- Validate input.
+- Create inventory log entries for changed quantities.
+- If no quantity changed, show “No changes to save.”
+
+Apply this to:
+- Warehouse quantity adjustment page
+- Locker quantity adjustment page if it has the same pattern
+
+5. Add quantity input when creating a new food item
+When admin/manager creates a new food item, allow initial quantities.
+
+Food creation form should include:
+- name
+- category
+- calories per serving
+- serving size
+- low-stock threshold
+- active status
+- initial warehouse quantity
+- initial locker quantity
+
+Rules:
+- initial quantities default to 0
+- prevent negative values
+- create inventory logs for nonzero initial quantities
+- warehouse and locker quantities must be saved correctly
+
+6. Improve Inventory Logs / History page
+Add better filtering and pagination.
+
+Filters:
+- Date filter:
+  - choose a specific date and show everything that happened on that date
+- User filter:
+  - choose a specific user and show only that user’s actions
+- Combined filter:
+  - choose user + date to see that user’s actions on that date
+- All option:
+  - allow clearing filters to show all logs
+
+Pagination:
+- Show 10 log actions per page by default.
+- Add page numbers below the table.
+- Add previous and next buttons.
+- Add first/last page buttons if easy.
+- Follow the style of a standard pagination bar:
+  Previous | 1 | 2 | 3 | ... | Next
+- Keep it clean and readable.
+
+History table should show:
+- date/time
+- user
+- action type
+- food item
+- quantity
+- source/destination
+- note
+- remaining warehouse quantity if available
+- remaining locker quantity if available
+
+7. Improve Shareable Food Log if related
+If the app already has Shareable Food Log:
+- keep grouped format
+- allow filtering by date and user if reasonable
+- keep one row per student/date/session when multiple foods are taken together
+- do not break existing share/copy/export behavior
+
+8. UI polish
+Make affected pages cleaner:
+- Settings/Profile
+- Warehouse
+- Locker
+- Food Items
+- Inventory Logs/History
+
+Use consistent buttons, spacing, and labels.
+
+9. Documentation update
+Update README.md and docs/project-spec.md with:
+- phone formatting behavior
+- Homepage wording
+- bulk inventory save behavior
+- initial quantities when creating food
+- inventory history filtering and pagination
+
+After finishing, summarize:
+1. files changed
+2. new dependencies if any
+3. database/schema changes if any
+4. how to test phone formatting
+5. how to test bulk quantity save
+6. how to test new food creation with quantity
+7. how to test history filters and pagination

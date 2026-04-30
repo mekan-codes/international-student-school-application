@@ -61,6 +61,12 @@ def staff_required(view):
 # --------------------------------------------------------------------------- #
 def _log_action(food: FoodItem, action_type: str, quantity: int,
                 source: str | None, destination: str | None, note: str = "") -> None:
+    """Append an inventory log row.
+
+    `warehouse_qty_after` and `locker_qty_after` are captured from the food
+    object's current state, so callers should mutate the FoodItem BEFORE
+    calling this function.
+    """
     log = InventoryLog(
         food_id=food.id, food_name=food.name,
         action_type=action_type, quantity=quantity,
@@ -68,6 +74,8 @@ def _log_action(food: FoodItem, action_type: str, quantity: int,
         performed_by_user_id=current_user.id,
         performed_by_user_name=current_user.name,
         note=note or None, timestamp=datetime.utcnow(),
+        warehouse_qty_after=food.warehouse_quantity,
+        locker_qty_after=food.locker_quantity,
     )
     db.session.add(log)
 
@@ -383,21 +391,46 @@ def _parse_calories(raw: str | None) -> tuple[bool, int | None, str]:
     return True, v, ""
 
 
+def _parse_nonneg_int(raw: str | None, label: str) -> tuple[bool, int, str]:
+    """Parse a non-negative integer. Empty/None becomes 0."""
+    raw = (raw or "").strip()
+    if not raw:
+        return True, 0, ""
+    try:
+        v = int(raw)
+    except ValueError:
+        return False, 0, f"{label} must be a whole number."
+    if v < 0:
+        return False, 0, f"{label} cannot be negative."
+    return True, v, ""
+
+
 @admin_bp.route("/food-items/add", methods=["POST"])
 @staff_required
 def add_food_item():
     name = (request.form.get("name") or "").strip()
     category = (request.form.get("category") or "general").strip()
     serving_size = (request.form.get("serving_size") or "").strip() or None
-    try:
-        threshold = max(0, int(request.form.get("low_stock_threshold") or 0))
-    except ValueError:
-        flash("Threshold must be a non-negative integer.", "danger")
-        return redirect(url_for("admin.food_items"))
+    is_active = bool(request.form.get("is_active"))
+
+    ok, threshold, err = _parse_nonneg_int(
+        request.form.get("low_stock_threshold"), "Low-stock threshold")
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.food_items"))
+
     cal_ok, calories, cal_err = _parse_calories(request.form.get("calories_per_serving"))
     if not cal_ok:
-        flash(cal_err, "danger")
-        return redirect(url_for("admin.food_items"))
+        flash(cal_err, "danger"); return redirect(url_for("admin.food_items"))
+
+    ok, init_wh, err = _parse_nonneg_int(
+        request.form.get("initial_warehouse_quantity"), "Initial warehouse quantity")
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.food_items"))
+
+    ok, init_lk, err = _parse_nonneg_int(
+        request.form.get("initial_locker_quantity"), "Initial locker quantity")
+    if not ok:
+        flash(err, "danger"); return redirect(url_for("admin.food_items"))
 
     if not name:
         flash("Food name is required.", "danger")
@@ -409,8 +442,22 @@ def add_food_item():
     item = FoodItem(
         name=name, category=category, low_stock_threshold=threshold,
         calories_per_serving=calories, serving_size=serving_size,
+        is_active=is_active,
+        warehouse_quantity=init_wh, locker_quantity=init_lk,
     )
     db.session.add(item)
+    db.session.flush()  # populate item.id for log FK
+
+    # Inventory log entries for any nonzero starting stock.
+    if init_wh > 0:
+        _log_action(item, "add_to_warehouse", init_wh,
+                    source=None, destination="warehouse",
+                    note="Initial stock on creation")
+    if init_lk > 0:
+        _log_action(item, "adjust_locker", init_lk,
+                    source=None, destination="locker",
+                    note="Initial stock on creation")
+
     db.session.commit()
     flash(f"Created food item: {name}.", "success")
     return redirect(url_for("admin.food_items"))
@@ -491,9 +538,60 @@ def add_warehouse_stock():
     return redirect(url_for("admin.warehouse"))
 
 
+def _bulk_adjust(field: str, action_type: str, redirect_endpoint: str):
+    """Shared logic for bulk warehouse/locker quantity edits.
+
+    Reads form fields named `qty_<food_id>` for every food item, validates
+    each as a non-negative integer, then applies any rows whose value
+    actually changed. One inventory log entry per changed row.
+    """
+    items = FoodItem.query.all()
+    note = (request.form.get("note") or "Bulk adjustment").strip()
+
+    changes: list[tuple[FoodItem, int, int]] = []  # (item, old, new)
+    for item in items:
+        raw = request.form.get(f"qty_{item.id}")
+        if raw is None:
+            continue
+        raw = raw.strip()
+        if raw == "":
+            continue
+        try:
+            new_qty = int(raw)
+        except ValueError:
+            flash(f"Quantity for {item.name} must be a whole number.", "danger")
+            return redirect(url_for(redirect_endpoint))
+        if new_qty < 0:
+            flash(f"Quantity for {item.name} cannot be negative.", "danger")
+            return redirect(url_for(redirect_endpoint))
+        old_qty = getattr(item, field)
+        if new_qty != old_qty:
+            changes.append((item, old_qty, new_qty))
+
+    if not changes:
+        flash("No changes to save.", "info")
+        return redirect(url_for(redirect_endpoint))
+
+    location = "warehouse" if field == "warehouse_quantity" else "locker"
+    summary_parts: list[str] = []
+    for item, old_qty, new_qty in changes:
+        delta = new_qty - old_qty
+        setattr(item, field, new_qty)
+        _log_action(item, action_type, delta,
+                    source=location, destination=location,
+                    note=note)
+        summary_parts.append(f"{item.name} ({old_qty}→{new_qty})")
+
+    db.session.commit()
+    flash(f"Saved {len(changes)} change(s): " + ", ".join(summary_parts),
+          "success")
+    return redirect(url_for(redirect_endpoint))
+
+
 @admin_bp.route("/warehouse/adjust", methods=["POST"])
 @staff_required
 def adjust_warehouse():
+    """Single-row warehouse quantity setter (kept for compatibility)."""
     item = db.session.get(FoodItem, int(request.form.get("food_id") or 0)) or abort(404)
     try:
         new_qty = int(request.form.get("new_quantity"))
@@ -516,6 +614,13 @@ def adjust_warehouse():
     db.session.commit()
     flash(f"Adjusted warehouse stock for {item.name} to {new_qty}.", "success")
     return redirect(url_for("admin.warehouse"))
+
+
+@admin_bp.route("/warehouse/bulk-adjust", methods=["POST"])
+@staff_required
+def bulk_adjust_warehouse():
+    return _bulk_adjust("warehouse_quantity", "adjust_warehouse",
+                        "admin.warehouse")
 
 
 # --------------------------------------------------------------------------- #
@@ -553,6 +658,12 @@ def adjust_locker():
     db.session.commit()
     flash(f"Adjusted locker stock for {item.name} to {new_qty}.", "success")
     return redirect(url_for("admin.locker"))
+
+
+@admin_bp.route("/locker/bulk-adjust", methods=["POST"])
+@staff_required
+def bulk_adjust_locker():
+    return _bulk_adjust("locker_quantity", "adjust_locker", "admin.locker")
 
 
 # --------------------------------------------------------------------------- #
@@ -773,8 +884,79 @@ def delete_distribution(dist_id):
 # --------------------------------------------------------------------------- #
 # Inventory history                                                           #
 # --------------------------------------------------------------------------- #
+PAGE_SIZE = 10
+
+
+def _page_window(current: int, last: int, span: int = 2) -> list[int | str]:
+    """Pagination helper: build a compact window of page numbers with
+    ellipses for skipped sections.
+
+    Example for current=5, last=20: [1, '…', 3, 4, 5, 6, 7, '…', 20]
+    """
+    if last <= 1:
+        return [1]
+    pages: list[int | str] = []
+    left = max(2, current - span)
+    right = min(last - 1, current + span)
+    pages.append(1)
+    if left > 2:
+        pages.append("…")
+    for p in range(left, right + 1):
+        pages.append(p)
+    if right < last - 1:
+        pages.append("…")
+    pages.append(last)
+    return pages
+
+
 @admin_bp.route("/logs")
 @staff_required
 def logs():
-    entries = InventoryLog.query.order_by(InventoryLog.timestamp.desc()).limit(500).all()
-    return render_template("admin/logs.html", logs=entries)
+    """Inventory history with filters (date, user) and pagination."""
+    # ---- Parse filters ----
+    on_date = _parse_date(request.args.get("date"))
+    user_id_raw = (request.args.get("user_id") or "").strip()
+    try:
+        user_id = int(user_id_raw) if user_id_raw else None
+    except ValueError:
+        user_id = None
+
+    try:
+        page = max(1, int(request.args.get("page") or 1))
+    except ValueError:
+        page = 1
+
+    # ---- Build query (filters applied at SQL level, not in Python) ----
+    q = InventoryLog.query
+    if on_date is not None:
+        start_dt = datetime.combine(on_date, datetime.min.time())
+        end_dt = datetime.combine(on_date + timedelta(days=1), datetime.min.time())
+        q = q.filter(InventoryLog.timestamp >= start_dt,
+                     InventoryLog.timestamp < end_dt)
+    if user_id is not None:
+        q = q.filter(InventoryLog.performed_by_user_id == user_id)
+    q = q.order_by(InventoryLog.timestamp.desc())
+
+    total = q.count()
+    last_page = max(1, (total + PAGE_SIZE - 1) // PAGE_SIZE)
+    if page > last_page:
+        page = last_page
+    offset = (page - 1) * PAGE_SIZE
+    entries = q.offset(offset).limit(PAGE_SIZE).all()
+
+    # ---- Distinct users for the filter dropdown ----
+    distinct_actors = (db.session.query(
+        InventoryLog.performed_by_user_id,
+        InventoryLog.performed_by_user_name,
+    ).distinct().order_by(InventoryLog.performed_by_user_name).all())
+
+    return render_template(
+        "admin/logs.html",
+        logs=entries,
+        page=page, last_page=last_page, total=total,
+        page_window=_page_window(page, last_page),
+        page_size=PAGE_SIZE,
+        actors=distinct_actors,
+        filter_date=request.args.get("date", ""),
+        filter_user_id=user_id_raw,
+    )

@@ -155,33 +155,65 @@
 {% endfor %}
 
 <div class="modal fade" id="addFood" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
+  <div class="modal-dialog modal-lg">
     <form method="post" action="{{ url_for('admin.add_food_item') }}" class="modal-content">
       <div class="modal-header">
         <h5 class="modal-title">Add food item</h5>
         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
       </div>
       <div class="modal-body">
-        <label class="form-label">Name</label>
-        <input class="form-control mb-2" name="name" required>
-        <label class="form-label">Category</label>
-        <input class="form-control mb-2" name="category" placeholder="e.g. grain, protein">
-        <div class="row">
+        <div class="row g-2">
+          <div class="col-md-7">
+            <label class="form-label">Name</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Category</label>
+            <input class="form-control" name="category" placeholder="e.g. grain, protein">
+          </div>
+        </div>
+
+        <div class="row g-2 mt-1">
           <div class="col-md-6">
             <label class="form-label">Calories per serving
               <small class="text-muted">(optional)</small></label>
-            <input class="form-control mb-2" type="number" min="0"
+            <input class="form-control" type="number" min="0"
                    name="calories_per_serving" placeholder="e.g. 250">
           </div>
           <div class="col-md-6">
             <label class="form-label">Serving size
               <small class="text-muted">(optional)</small></label>
-            <input class="form-control mb-2" name="serving_size" placeholder="e.g. 100g">
+            <input class="form-control" name="serving_size" placeholder="e.g. 100g">
           </div>
         </div>
-        <label class="form-label">Low-stock threshold</label>
-        <input class="form-control mb-2" type="number" min="0" value="0"
-               name="low_stock_threshold">
+
+        <div class="row g-2 mt-1">
+          <div class="col-md-4">
+            <label class="form-label">Low-stock threshold</label>
+            <input class="form-control" type="number" min="0" value="0"
+                   name="low_stock_threshold">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Initial warehouse qty</label>
+            <input class="form-control" type="number" min="0" value="0"
+                   name="initial_warehouse_quantity">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Initial locker qty</label>
+            <input class="form-control" type="number" min="0" value="0"
+                   name="initial_locker_quantity">
+          </div>
+        </div>
+
+        <div class="form-check mt-3">
+          <input class="form-check-input" type="checkbox" name="is_active"
+                 id="add-active" checked>
+          <label class="form-check-label" for="add-active">Active</label>
+        </div>
+        <div class="form-text">
+          Initial quantities default to 0. Each non-zero starting amount is recorded
+          in the inventory history.
+        </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
