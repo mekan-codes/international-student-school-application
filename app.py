@@ -7,7 +7,7 @@ from flask import Flask, redirect, url_for, render_template
 from flask_login import LoginManager, current_user, login_required
 from sqlalchemy import inspect, text
 
-from models import db, User
+from models import db, User, Resource
 from auth import auth_bp
 from admin import admin_bp
 from student import student_bp

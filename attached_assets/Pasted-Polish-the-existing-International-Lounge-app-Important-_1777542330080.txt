@@ -1,0 +1,329 @@
+Polish the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve the current UI style, colors, spacing, sidebar logic, and role system.
+- Keep all existing V1, V2, and V3 features working.
+- Focus on UI cleanup, editable resources, user page polish, and cleaning workflow polish.
+- Do not add common group chat yet.
+
+Current app context:
+International Lounge is a Flask + SQLite app for international students.
+Existing modules include:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile and phone privacy
+- substitute food management
+- announcements
+- requests to international department
+- borrowing
+- cleaning teams/sessions
+- resources/common drives page
+
+==================================================
+1. EDITABLE RESOURCES / COMMON DRIVES
+==================================================
+
+Currently Resources shows hardcoded Common Drive 1 and Common Drive 2 cards.
+Admin/manager should be able to manage these resources.
+
+Add database-backed resources if not already implemented.
+
+Resource fields:
+- id
+- title
+- description
+- url
+- is_active
+- created_by_user_id
+- created_at
+- updated_at
+
+Admin/manager features:
+- view all resources
+- add resource
+- edit resource title, description, URL, active/inactive status
+- delete resource with confirmation
+
+Student features:
+- view only active resources
+- click resource link, opening in a new tab
+
+UI:
+- Keep the Resources page clean.
+- For admin/manager, show resource cards with a Manage/Edit button.
+- For students, show only cards with external link buttons.
+- Use placeholder resources only if database is empty.
+- Validate URL format if simple.
+- External links should use target="_blank" and rel="noopener noreferrer".
+
+Sidebar:
+- Keep Resources visible to all logged-in users.
+- Place it under Communication or Lounge Life, whichever matches the current sidebar best.
+
+==================================================
+2. CLEANING ADMIN UI CLEANUP
+==================================================
+
+The current admin/manager Cleaning page is too crowded.
+Each subtask currently shows too many buttons at once, such as Verify, Missed, Delete.
+
+Improve it:
+- Show one clean “Manage” button or dropdown per subtask.
+- Inside the Manage modal/dropdown, include:
+  - verify task
+  - mark missed
+  - reset to assigned
+  - delete task
+  - edit/admin note if supported
+
+Task row/card should mainly show:
+- task name
+- status badge
+- marked done by
+- verified by if verified
+- short note if present
+- one Manage button for staff
+
+Session-level actions should also be cleaner:
+- Add subtask
+- Postpone
+- Approve session
+- Cancel session
+- Delete session
+
+Do not put too many action buttons in one line.
+Use a clean action area or dropdown if possible.
+
+==================================================
+3. CLEANING TASK STATUS CORRECTION
+==================================================
+
+Admin/manager should be able to change a task status if needed.
+
+Allowed staff task status changes:
+- assigned
+- marked_done
+- verified_done
+- missed
+
+Rules:
+- Students can mark tasks done only if the session is active/scheduled and their team is assigned.
+- Students cannot verify tasks.
+- Students cannot change missed/verified/cancelled tasks.
+- Admin/manager can reset missed task back to assigned if needed.
+- Admin/manager can verify a marked_done task.
+- Admin/manager can mark any non-deleted task missed.
+- Admin/manager can delete a task if needed.
+
+If the session is cancelled:
+- students cannot mark tasks done
+- admin/manager can still inspect/manage records where appropriate, but avoid accidental changes unless explicitly using Manage
+
+If the session is approved:
+- students cannot change tasks anymore
+
+==================================================
+4. STUDENT CLEANING PAGE POLISH
+==================================================
+
+Currently when a student marks a task done, the button changes to “Update”, but this is unclear and may do nothing.
+
+Fix this UX.
+
+For assigned tasks:
+- show optional note input
+- show “Mark done” button
+
+For marked_done tasks:
+- show text:
+  “Waiting for staff verification”
+- if note editing is supported, button should say “Update note”
+- if note editing is not actually supported, remove the button completely
+- do not show a vague “Update” button
+
+For verified_done tasks:
+- show:
+  “Verified by [name]”
+- no student action button
+
+For missed tasks:
+- show:
+  “Marked missed by staff”
+- no student action button
+
+For approved sessions:
+- show:
+  “This cleaning session has been approved.”
+- no student action buttons
+
+==================================================
+5. USERS PAGE UI POLISH
+==================================================
+
+The Users page is functional but looks too much like a raw admin database table.
+
+Improve the UI without breaking functionality.
+
+Current table can be simplified.
+
+Default columns should be:
+- Name
+- Student ID
+- Email
+- Status
+- Actions
+
+Move less frequently needed information into the Manage panel:
+- role
+- phone
+- sub-food membership
+- created date
+- password reset
+- protected status details
+
+Badges:
+- Replace technical “No” with “Standard”
+- Replace “Member” with “Sub-food”
+- Keep Admin, Manager, Student badges clean and softer if possible
+- Protected admin should remain clearly protected
+
+Actions:
+- Keep only one main Manage button per row.
+- Inside Manage panel, organize sections:
+  1. Profile
+  2. Role & permissions
+  3. Sub-food access
+  4. Password reset
+  5. Danger zone
+
+Search/filter:
+- Add search if simple:
+  - search by name
+  - student ID
+  - email
+- Keep role filter.
+- If search is too risky, skip it and mention it.
+
+Summary cards:
+Add small summary cards above the table if simple:
+- Total users
+- Students
+- Managers
+- Sub-food members
+
+Do not break admin/manager permission rules:
+- Manager cannot edit admin/manager accounts
+- Manager cannot create managers
+- Admin cannot delete/demote last admin
+- Protected accounts stay protected
+
+==================================================
+6. SIDEBAR POLISH
+==================================================
+
+The sidebar is getting crowded.
+Improve labels and grouping while preserving existing routes.
+
+Preferred grouping:
+
+For students:
+- Homepage
+- Communication:
+  - Announcements
+  - Requests
+  - Resources
+- Lounge Life:
+  - Borrowing
+  - Cleaning
+  - Lounge Locker only for sub-food students
+- Coming Soon:
+  - Group Chat
+
+For admin/manager:
+- Homepage
+- Management:
+  - Users
+  - Food Items
+- Inventory:
+  - Warehouse
+  - Locker
+  - Transfer Stock
+  - Shareable Food Log
+  - Inventory History
+- Communication:
+  - Announcements
+  - Requests
+  - Resources
+- Lounge Life:
+  - Borrowing
+  - Cleaning
+- Coming Soon:
+  - Group Chat
+
+Rename:
+- “Manage Borrowing” to “Borrowing”
+- “Manage Cleaning” to “Cleaning”
+
+Do not add complex collapsible menus unless easy and safe.
+Keep the sidebar footer/user chip behavior unchanged.
+
+==================================================
+7. EMPTY STATES
+==================================================
+
+Add friendly empty states where missing.
+
+Examples:
+- No cleaning sessions assigned yet.
+- No borrowing requests yet.
+- No announcements available.
+- No resources available yet.
+- No users match this filter.
+- No inventory history found for this filter.
+
+Keep them concise and visually consistent.
+
+==================================================
+8. DATA STRUCTURES / PERFORMANCE
+==================================================
+
+Because this is a data structures class project, add short comments where useful.
+
+Use:
+- database filtering instead of loading everything and filtering manually
+- dictionaries/hash maps for O(1) lookup where useful
+- simple indexed queries if applicable
+- avoid repeated filtering inside templates
+
+Do not over-engineer.
+
+==================================================
+9. DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Mention:
+- editable Resources/Common Drives
+- cleaned Users page
+- cleaned Cleaning page
+- improved student cleaning task states
+- sidebar grouping
+- empty states
+- any schema changes
+
+==================================================
+10. TESTING SUMMARY
+==================================================
+
+After finishing, summarize:
+1. files changed
+2. schema changes
+3. how to test editable resources
+4. how to test admin/manager cleaning task management
+5. how to test student cleaning page behavior
+6. how to test Users page UI
+7. how to test sidebar grouping
+8. anything skipped or left for later

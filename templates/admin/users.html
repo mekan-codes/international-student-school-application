@@ -2,6 +2,35 @@
 {% block title %}Users{% endblock %}
 
 {% block content %}
+
+{# ---- Summary cards (SQL-computed counts passed from the route) ---- #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div class="fs-3 fw-bold text-primary">{{ counts.total }}</div>
+      <div class="text-muted small">Total users</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div class="fs-3 fw-bold text-secondary">{{ counts.students }}</div>
+      <div class="text-muted small">Students</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div class="fs-3 fw-bold text-info">{{ counts.managers }}</div>
+      <div class="text-muted small">Managers</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center py-3">
+      <div class="fs-3 fw-bold text-success">{{ counts.sub_food }}</div>
+      <div class="text-muted small">Sub-food members</div>
+    </div>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
     <div>
@@ -14,7 +43,7 @@
         {% endif %}
       </div>
     </div>
-    <div class="d-flex gap-2">
+    <div class="d-flex gap-2 flex-wrap">
       <form method="get" class="d-flex gap-2 align-items-center">
         <select name="role" class="form-select form-select-sm" onchange="this.form.submit()">
           <option value="all" {% if role_filter == 'all' %}selected{% endif %}>All roles</option>
@@ -24,16 +53,20 @@
         </select>
       </form>
       <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addUser">
-        <i class="bi bi-plus-lg"></i> Add User
+        <i class="bi bi-plus-lg"></i> Add user
       </button>
     </div>
   </div>
+
   <div class="table-responsive">
     <table class="table table-hover align-middle mb-0">
       <thead>
         <tr>
-          <th>Name</th><th>Role</th><th>Student ID</th><th>Email</th><th>Phone</th>
-          <th>Sub-Food</th><th>Created</th><th class="text-end">Actions</th>
+          <th>Name</th>
+          <th>Student ID</th>
+          <th>Email</th>
+          <th>Status</th>
+          <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
@@ -48,7 +81,10 @@
               {% endif %}
             </div>
           </td>
+          <td class="text-muted">{{ u.student_id or '—' }}</td>
+          <td class="text-muted small">{{ u.email }}</td>
           <td>
+            {# Role badge #}
             {% if u.is_admin %}
               <span class="badge bg-primary">Admin</span>
             {% elif u.is_manager %}
@@ -56,56 +92,44 @@
             {% else %}
               <span class="badge bg-secondary">Student</span>
             {% endif %}
-          </td>
-          <td>{{ u.student_id or '—' }}</td>
-          <td>{{ u.email }}</td>
-          <td>
-            {% if u.phone_number %}
-              {% if u.show_phone_number %}
-                {{ u.phone_number }}
-              {% else %}
-                <span class="text-muted small">
-                  <i class="bi bi-eye-slash"></i> hidden
-                </span>
-              {% endif %}
-            {% else %}
-              <span class="text-muted">—</span>
-            {% endif %}
-          </td>
-          <td>
+            {# Sub-food badge (students only) #}
             {% if u.role == 'student' %}
               {% if u.is_sub_food_member %}
-                <span class="badge bg-success">Member</span>
+                <span class="badge bg-success ms-1">Sub-food</span>
               {% else %}
-                <span class="badge bg-secondary">No</span>
+                <span class="badge bg-light text-muted border ms-1">Standard</span>
               {% endif %}
-            {% else %}
-              <span class="text-muted">n/a</span>
             {% endif %}
           </td>
-          <td><small>{{ u.created_at.strftime('%Y-%m-%d') }}</small></td>
           <td class="text-end">
             {% if can_manage %}
-              <button type="button" class="btn btn-sm btn-primary"
+              <button type="button" class="btn btn-sm btn-outline-secondary"
                       data-bs-toggle="modal" data-bs-target="#manageUser{{ u.id }}">
                 <i class="bi bi-gear"></i> Manage
               </button>
             {% else %}
               <span class="text-muted small">
-                {% if u.is_protected %}Protected{% else %}—{% endif %}
+                {% if u.is_protected %}
+                  <i class="bi bi-shield-lock" title="Protected"></i> Protected
+                {% else %}—{% endif %}
               </span>
             {% endif %}
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="8" class="text-center text-muted py-4">No users.</td></tr>
+        <tr>
+          <td colspan="5" class="text-center text-muted py-5">
+            <i class="bi bi-people" style="font-size:1.5rem;"></i>
+            <div class="mt-1">No users match this filter.</div>
+          </td>
+        </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-{# ---------- Manage modals (one consolidated panel per user) ---------- #}
+{# ---------- Manage modals ---------- #}
 {% for u in users %}
 {% set can_manage = (current_user.is_admin or (current_user.is_manager and u.role == 'student')) and not u.is_protected %}
 {% if can_manage %}
@@ -124,8 +148,10 @@
       </div>
       <div class="modal-body">
 
-        {# ===== Section: profile info ===== #}
-        <h6 class="text-uppercase text-muted small mb-2">Profile information</h6>
+        {# ===== 1. Profile ===== #}
+        <h6 class="text-uppercase text-muted small mb-2">
+          <i class="bi bi-person"></i> Profile
+        </h6>
         <form method="post" action="{{ url_for('admin.edit_user', user_id=u.id) }}"
               class="manage-section">
           <div class="row g-2">
@@ -144,16 +170,13 @@
               <input class="form-control" name="student_id"
                      value="{{ u.student_id or '' }}" required>
             </div>
-            <div class="col-md-6 d-flex align-items-end">
-              <div class="form-check">
-                <input class="form-check-input" type="checkbox" name="is_sub_food_member"
-                       id="member-{{ u.id }}"
-                       {% if u.is_sub_food_member %}checked{% endif %}>
-                <label class="form-check-label" for="member-{{ u.id }}">
-                  Substitute food program member
-                </label>
-              </div>
-            </div>
+            {% endif %}
+          </div>
+          <div class="text-muted small mt-2">
+            Joined {{ u.created_at.strftime('%b %d, %Y') }}
+            {% if u.phone_number %}
+              · Phone: {{ u.phone_number }}
+              {% if not u.show_phone_number %}<span class="ms-1">(hidden from others)</span>{% endif %}
             {% endif %}
           </div>
           <div class="mt-2 text-end">
@@ -163,17 +186,19 @@
           </div>
         </form>
 
-        {# ===== Section: role change (admin only) ===== #}
+        {# ===== 2. Role & permissions (admin only) ===== #}
         {% if current_user.is_admin %}
           {% if u.role == 'student' %}
           <hr>
-          <h6 class="text-uppercase text-muted small mb-2">Role</h6>
+          <h6 class="text-uppercase text-muted small mb-2">
+            <i class="bi bi-shield"></i> Role &amp; permissions
+          </h6>
           <form method="post" action="{{ url_for('admin.promote_user', user_id=u.id) }}"
                 class="manage-section"
                 onsubmit="return confirm('Promote {{ u.name }} to manager?');">
             <p class="small text-muted mb-2">
-              Promote this student to a manager. Their substitute-food
-              membership will be cleared.
+              Promote this student to a manager.
+              Their substitute-food membership will be cleared.
             </p>
             <button type="submit" class="btn btn-outline-info btn-sm">
               <i class="bi bi-arrow-up-circle"></i> Promote to manager
@@ -181,13 +206,15 @@
           </form>
           {% elif u.role == 'manager' %}
           <hr>
-          <h6 class="text-uppercase text-muted small mb-2">Role</h6>
+          <h6 class="text-uppercase text-muted small mb-2">
+            <i class="bi bi-shield"></i> Role &amp; permissions
+          </h6>
           <form method="post" action="{{ url_for('admin.demote_user', user_id=u.id) }}"
                 class="manage-section"
-                onsubmit="return confirm('Demote {{ u.name }} to student? Make sure a Student ID is set on the profile.');">
+                onsubmit="return confirm('Demote {{ u.name }} to student?');">
             <p class="small text-muted mb-2">
-              Demote this manager back to a student. A Student ID must be
-              set on the profile first.
+              Demote this manager back to a student.
+              A Student ID must be set on the profile first.
             </p>
             <button type="submit" class="btn btn-outline-warning btn-sm">
               <i class="bi bi-arrow-down-circle"></i> Demote to student
@@ -196,20 +223,22 @@
           {% endif %}
         {% endif %}
 
-        {# ===== Section: substitute-food membership toggle ===== #}
+        {# ===== 3. Sub-food access (students only) ===== #}
         {% if u.role == 'student' %}
         <hr>
-        <h6 class="text-uppercase text-muted small mb-2">Substitute food program</h6>
+        <h6 class="text-uppercase text-muted small mb-2">
+          <i class="bi bi-box2"></i> Sub-food access
+        </h6>
         <form method="post" action="{{ url_for('admin.toggle_member', user_id=u.id) }}"
-              class="manage-section">
-          <p class="small text-muted mb-2">
+              class="manage-section d-flex justify-content-between align-items-center">
+          <div class="small text-muted">
             Currently:
             {% if u.is_sub_food_member %}
-              <span class="badge bg-success">Member</span>
+              <span class="badge bg-success">Sub-food member</span>
             {% else %}
-              <span class="badge bg-secondary">Not a member</span>
+              <span class="badge bg-light text-muted border">Standard</span>
             {% endif %}
-          </p>
+          </div>
           <button type="submit" class="btn btn-outline-secondary btn-sm">
             <i class="bi bi-toggles"></i>
             {% if u.is_sub_food_member %}Remove from program{% else %}Add to program{% endif %}
@@ -217,29 +246,29 @@
         </form>
         {% endif %}
 
-        {# ===== Section: reset password (admin only) ===== #}
+        {# ===== 4. Password reset (admin only) ===== #}
         {% if current_user.is_admin %}
         <hr>
-        <h6 class="text-uppercase text-muted small mb-2">Password</h6>
+        <h6 class="text-uppercase text-muted small mb-2">
+          <i class="bi bi-key"></i> Password reset
+        </h6>
         <form method="post" action="{{ url_for('admin.reset_password', user_id=u.id) }}"
               class="manage-section">
           <p class="small text-muted mb-2">
-            Set a temporary password. The current password is never shown.
-            Share the new one securely and ask the user to change it from
-            their profile.
+            Set a temporary password and ask the user to change it from their settings.
           </p>
           <div class="input-group input-group-sm">
             <input class="form-control" type="text" name="new_password"
                    minlength="6" required autocomplete="off"
                    placeholder="At least 6 characters">
             <button type="submit" class="btn btn-warning">
-              <i class="bi bi-key"></i> Reset password
+              <i class="bi bi-key"></i> Reset
             </button>
           </div>
         </form>
         {% endif %}
 
-        {# ===== Section: danger zone — delete ===== #}
+        {# ===== 5. Danger zone — delete ===== #}
         {% if u.id != current_user.id and (current_user.is_admin or u.role == 'student') %}
         <div class="danger-zone mt-4">
           <h6 class="text-uppercase text-danger small mb-2">
@@ -249,7 +278,7 @@
                 class="d-flex justify-content-between align-items-center"
                 onsubmit="return confirm('Permanently delete {{ u.name }}? This cannot be undone.');">
             <div class="small text-muted">
-              Deleting removes this account permanently.
+              Removes this account permanently.
               {% if u.is_admin %}
                 The system always keeps at least one admin.
               {% endif %}

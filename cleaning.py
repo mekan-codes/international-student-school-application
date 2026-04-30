@@ -602,3 +602,33 @@ def mark_missed(task_id):
     db.session.commit()
     flash(f"Marked “{t.task_name}” as missed.", "info")
     return redirect(url_for("cleaning.index"))
+
+
+@cleaning_bp.route("/tasks/<int:task_id>/reset", methods=["POST"])
+@staff_required
+def reset_task(task_id):
+    """Staff can reset a task back to 'assigned' — useful when a missed task
+    needs to be retried or a mark-done was recorded in error."""
+    t = db.session.get(CleaningTask, task_id) or abort(404)
+    s = t.session
+    if s.status in ("approved", "cancelled"):
+        flash("Tasks in approved or cancelled sessions cannot be reset.",
+              "warning")
+        return redirect(url_for("cleaning.index"))
+    # Clear all completion tracking fields so the task starts fresh.
+    t.status = "assigned"
+    t.student_note = None
+    t.marked_done_by_user_id = None
+    t.marked_done_by_name = None
+    t.marked_done_at = None
+    t.verified_by_user_id = None
+    t.verified_by_name = None
+    t.verified_at = None
+    t.admin_note = None
+    # If the session had auto-flipped to marked_done, reopen it.
+    if s.status == "marked_done":
+        s.status = "scheduled"
+        s.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash("Reset task to Assigned.", "info")
+    return redirect(url_for("cleaning.index"))

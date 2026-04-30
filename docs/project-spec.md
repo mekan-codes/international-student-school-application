@@ -693,3 +693,55 @@ and the `Start application` workflow.
   the team gets HTTP 403 from the same URL.
 - **Resources** — both an admin and a student can open `/resources/`;
   both cards render and open in a new browser tab.
+
+## V3.2 Polish (Apr 2026)
+
+### Editable Resources / Common Drives
+- New `Resource` model (`resources` table) with fields: `id`, `title`,
+  `description`, `url`, `is_active`, `created_by_user_id`, `created_at`,
+  `updated_at`.
+- `resources.py` blueprint rewritten: staff (admin/manager) can add, edit,
+  and delete resource cards via modal forms. Students see only active rows.
+- `is_active` acts as a soft-disable: staff can hide a link without deleting
+  it. Inactive cards render dimmed for staff with an "Inactive" badge.
+- URL validated server-side (`http://` / `https://` scheme required).
+- Placeholder resources seeded on first-run via `seed.py`.
+
+### Cleaning admin UI cleanup
+- Per-task action buttons (Verify, Missed, Delete) replaced with a single
+  **Manage** button per task, which opens a Bootstrap modal.
+- The modal contains: Verify, Mark Missed, Reset to Assigned, Delete task.
+- "Reset to Assigned" clears all progress fields and reopens the session if
+  it had auto-flipped to `marked_done`.
+- Session-level actions (Add subtask, Postpone, Edit, Approve, Cancel,
+  Delete) are shown in a clean horizontal action row per session; the Edit
+  and Postpone forms open as Bootstrap collapse panels to keep the page tidy.
+
+### Student cleaning task UX fix
+- `assigned` tasks: note input + "Mark done" button (unchanged).
+- `marked_done` tasks: "Waiting for staff verification" text only — no
+  vague "Update" button.
+- `verified_done` tasks: "Verified by [name]" text only.
+- `missed` tasks: "Marked missed by staff" text only.
+- Approved sessions show an alert banner; no student action buttons shown.
+
+### Users page polish
+- Table simplified to: Name, Student ID, Email, Status, Actions.
+  Phone, created-at, and sub-food details moved inside the Manage modal.
+- Summary cards above the table: Total users, Students, Managers, Sub-food.
+- Badges updated: "No" → "Standard", "Member" → "Sub-food".
+- `counts` dict computed server-side via SQL `COUNT(*)` aggregates, passed
+  to the template for O(1) template access.
+
+### Sidebar reorganisation
+- Both staff and student sidebars: Resources moved from "Lounge Life" to
+  "Communication" section.
+- Staff sidebar: "Manage" section renamed to "Management".
+- "Lounge life" capitalised consistently to "Lounge Life" everywhere.
+- Student sidebar: Lounge Locker moved inside the "Lounge Life" section
+  (only visible to sub-food members).
+
+### Schema change summary
+| Table | Change |
+|-------|--------|
+| `resources` | New table (created by `db.create_all()`) |

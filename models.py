@@ -661,3 +661,33 @@ class CleaningTask(db.Model):
             "verified_done": "bg-success",
             "missed": "bg-danger",
         }.get(self.status, "bg-secondary")
+
+
+# =========================================================================== #
+# Version 3.2: Editable Resources / Common Drives                             #
+# =========================================================================== #
+class Resource(db.Model):
+    """Staff-managed link card shown on the Resources page.
+
+    Using a DB-backed table instead of a hardcoded list lets admins and
+    managers add/edit/remove resources without touching code.
+    `is_active` acts as a soft-delete: students only see active resources,
+    but staff see all rows (useful for temporarily hiding a link).
+    """
+    __tablename__ = "resources"
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    url = db.Column(db.String(500), nullable=False)
+
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+
+    # FK to the staff user who created this resource (never null after creation).
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                   nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )

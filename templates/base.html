@@ -29,7 +29,7 @@
           <i class="bi bi-speedometer2"></i> Homepage
         </a>
 
-        <div class="nav-section">Manage</div>
+        <div class="nav-section">Management</div>
         <a href="{{ url_for('admin.users') }}"
            class="{% if request.endpoint == 'admin.users' %}active{% endif %}">
           <i class="bi bi-people"></i> Users
@@ -70,8 +70,12 @@
            class="{% if request.blueprint == 'requests' %}active{% endif %}">
           <i class="bi bi-envelope-paper"></i> Requests
         </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
+        </a>
 
-        <div class="nav-section">Lounge life</div>
+        <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
            class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
           <i class="bi bi-bag"></i> Borrowing
@@ -80,12 +84,8 @@
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Cleaning
         </a>
-        <a href="{{ url_for('resources.index') }}"
-           class="{% if request.blueprint == 'resources' %}active{% endif %}">
-          <i class="bi bi-folder2-open"></i> Resources
-        </a>
 
-        <div class="nav-section">Coming soon</div>
+        <div class="nav-section">Coming Soon</div>
         <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
           <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
         </a>
@@ -98,13 +98,6 @@
           <i class="bi bi-speedometer2"></i> Homepage
         </a>
 
-        {% if current_user.is_sub_food_member %}
-          <a href="{{ url_for('student.food') }}"
-             class="{% if request.endpoint == 'student.food' %}active{% endif %}">
-            <i class="bi bi-archive"></i> Lounge Locker
-          </a>
-        {% endif %}
-
         <div class="nav-section">Communication</div>
         <a href="{{ url_for('announcements.list_view') }}"
            class="{% if request.blueprint == 'announcements' %}active{% endif %}">
@@ -114,8 +107,12 @@
            class="{% if request.blueprint == 'requests' %}active{% endif %}">
           <i class="bi bi-envelope-paper"></i> Requests
         </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
+        </a>
 
-        <div class="nav-section">Lounge life</div>
+        <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
            class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
           <i class="bi bi-bag"></i> Borrowing
@@ -124,12 +121,14 @@
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Cleaning
         </a>
-        <a href="{{ url_for('resources.index') }}"
-           class="{% if request.blueprint == 'resources' %}active{% endif %}">
-          <i class="bi bi-folder2-open"></i> Resources
-        </a>
+        {% if current_user.is_sub_food_member %}
+          <a href="{{ url_for('student.food') }}"
+             class="{% if request.endpoint == 'student.food' %}active{% endif %}">
+            <i class="bi bi-archive"></i> Lounge Locker
+          </a>
+        {% endif %}
 
-        <div class="nav-section">Coming soon</div>
+        <div class="nav-section">Coming Soon</div>
         <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
           <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
         </a>
