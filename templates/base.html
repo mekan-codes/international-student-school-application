@@ -74,11 +74,15 @@
         <div class="nav-section">Lounge life</div>
         <a href="{{ url_for('borrowing.index') }}"
            class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
-          <i class="bi bi-bag"></i> Manage Borrowing
+          <i class="bi bi-bag"></i> Borrowing
         </a>
         <a href="{{ url_for('cleaning.index') }}"
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
-          <i class="bi bi-droplet"></i> Manage Cleaning
+          <i class="bi bi-droplet"></i> Cleaning
+        </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
         </a>
 
         <div class="nav-section">Coming soon</div>
@@ -119,6 +123,10 @@
         <a href="{{ url_for('cleaning.index') }}"
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
           <i class="bi bi-droplet"></i> Cleaning
+        </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
         </a>
 
         <div class="nav-section">Coming soon</div>

@@ -52,6 +52,16 @@
           </div>
         </div>
 
+        {% if a.target_audience == 'specific_students' and a.recipients %}
+          <div class="mt-2 small text-muted">
+            <i class="bi bi-people"></i>
+            Sent to:
+            {% for name in a.recipient_names %}
+              <span class="badge bg-light text-dark border">{{ name }}</span>
+            {% endfor %}
+          </div>
+        {% endif %}
+
         <hr class="my-3">
         <div class="announcement-body">{{ a.content }}</div>
 

@@ -1,0 +1,233 @@
+Improve the existing International Lounge V3 features.
+
+Important:
+* Do NOT rebuild the app from scratch.
+* Modify the existing code only.
+* Preserve the current UI style, spacing, colors, and role system.
+* Keep all V1, V2, and V3 features working.
+* Focus on cleaning workflow, team visibility, targeted announcements, and sidebar polish.
+
+==================================================
+1. CLEANING TEAM VISIBILITY FOR STUDENTS
+==================================================
+
+Currently students can see that they are assigned to a team, such as “Team 1”, but they cannot see who their teammates are.
+
+Improve this:
+* Make the team badge/name clickable on the student Cleaning page.
+* When clicked, show the team members.
+* This can be a modal, panel, or simple team detail page.
+* Do NOT add a new sidebar tab just for teams.
+
+Team member display should show:
+* team name
+* student names
+* student IDs if available
+* phone number only if show_phone_number is true
+* no private/hidden phone numbers
+
+Students should only be able to view teams they belong to.
+Admin/manager can still view/manage all teams.
+
+==================================================
+2. TARGETED ANNOUNCEMENTS TO SPECIFIC STUDENTS
+==================================================
+
+Improve announcement target audience.
+
+Current target audiences include:
+* everyone
+* all_students
+* sub_food_students
+* staff_only
+
+Add:
+* specific_students
+
+When admin/manager selects “Specific students”:
+* show a multi-select list of students
+* admin/manager can choose one or more students
+* the announcement should be visible only to selected students and staff
+* students not selected should not see it
+* unpublished announcements must still be hidden from students
+
+Add a join/model/table if needed:
+AnnouncementRecipient:
+* id
+* announcement_id
+* student_user_id
+
+Rules:
+* if target_audience is specific_students, at least one student must be selected
+* admin/manager can edit selected students later
+* students should not see internal target labels unless needed
+* admin/manager should see target audience and selected recipients in management view
+
+==================================================
+3. SIDEBAR POLISH / REDUCE CLUTTER
+==================================================
+
+The sidebar is getting crowded. Improve labels and grouping without breaking routes.
+
+For students:
+* Homepage
+* Communication:
+  - Announcements
+  - Requests
+* Lounge Life:
+  - Borrowing
+  - Cleaning
+  - Lounge Locker only for sub-food students
+* Coming Soon:
+  - Group Chat
+
+For admin/manager:
+* Homepage
+* Management:
+  - Users
+  - Food Items
+* Inventory:
+  - Warehouse
+  - Locker
+  - Transfer Stock
+  - Shareable Food Log
+  - Inventory History
+* Communication:
+  - Announcements
+  - Requests
+* Lounge Life:
+  - Borrowing
+  - Cleaning
+* Coming Soon:
+  - Group Chat
+
+Rename:
+* “Manage Borrowing” to “Borrowing”
+* “Manage Cleaning” to “Cleaning”
+
+Do not add complex collapsible menus unless easy and safe.
+Keep current sidebar footer/user chip behavior.
+
+==================================================
+4. CLEANING SESSION DATE RANGE AND POSTPONE WORKFLOW
+==================================================
+
+Change cleaning sessions from exact time range to date-range based workflow.
+
+Cleaning is usually assigned for a period like:
+Friday to Sunday, ending Sunday 23:59.
+
+Update cleaning sessions:
+* use start_date
+* use end_date
+* remove or de-emphasize start_time/end_time from UI
+* if existing start_time/end_time fields exist, keep them for compatibility but do not require them
+* display sessions as date ranges
+
+Example:
+May 8, 2026 – May 10, 2026
+
+Cleaning session status values should support:
+* scheduled
+* marked_done
+* approved
+* postponed
+* cancelled
+
+Task status values can remain:
+* assigned
+* marked_done
+* verified_done
+* missed
+
+Student/team workflow:
+* team members mark subtasks done
+* when all subtasks are marked_done or verified_done, show that the team submitted/completed the work
+* staff must approve the whole cleaning session
+* after staff approval, session status becomes approved
+* assigned team can see that their work was approved
+
+Admin/manager workflow:
+* create cleaning session with assigned team and start_date/end_date
+* add subtasks
+* postpone session:
+  - choose new start_date
+  - choose new end_date
+  - optionally add postpone note
+  - status becomes postponed or returns to scheduled with a visible postponed history/note
+* approve session:
+  - verify/approve the team’s work
+  - session status becomes approved
+* cancel session if needed
+
+Postpone behavior:
+* If Team 1 cannot finish this week, admin/manager can postpone the same session to next week.
+* Preserve the assigned team and tasks.
+* Update the date range.
+* Show a note/history that it was postponed if easy.
+
+Validation:
+* end_date cannot be before start_date
+* cancelled sessions cannot be marked done by students
+* approved sessions cannot be changed by students
+* students can only mark tasks for sessions assigned to their team
+
+==================================================
+5. DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md with:
+* clickable team/member visibility
+* specific-student announcements
+* sidebar grouping changes
+* cleaning date-range workflow
+* cleaning postpone/approval workflow
+
+==================================================
+6. TESTING SUMMARY
+==================================================
+
+After finishing, summarize:
+1. files changed
+2. schema changes
+3. how to test team member visibility
+4. how to test specific-student announcements
+5. how to test sidebar changes
+6. how to test cleaning postponement
+7. how to test cleaning approval
+8. any limitations
+==================================================
+5. COMMON DRIVES / RESOURCES PAGE
+==================================================
+
+Add a simple Resources page for common drive links.
+
+Purpose:
+International students have common shared drives where useful files are stored. The app should provide easy access to those drives.
+
+Sidebar:
+* Add a new sidebar item called “Resources” or “Common Drives”.
+* Show it to all logged-in users.
+* Place it under Communication or Lounge Life, whichever fits the current sidebar better.
+
+Page content:
+* Title: Common Drives
+* Show two resource cards:
+  1. Common Drive 1
+  2. Common Drive 2
+* Each card should have:
+  - title
+  - short description
+  - external link button
+* Links should open in a new tab.
+* Use placeholder URLs for now if real URLs are not available.
+
+Placeholder links:
+* Common Drive 1: https://example.com/common-drive-1
+* Common Drive 2: https://example.com/common-drive-2
+
+Future improvement:
+* Admin/manager can edit these links later.
+* For now, hardcoded links are acceptable.
+
+Update README.md and docs/project-spec.md to mention the Resources/Common Drives page.

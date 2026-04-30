@@ -17,13 +17,17 @@
     <p class="text-muted mb-0">
       Cleaning sessions assigned to your team
       {% if my_teams|length > 1 %}s{% endif %}.
-      Tick subtasks as you finish — staff will verify them.
+      Tick subtasks as you finish — staff will verify and approve.
+      Tap a team to see who's on it.
     </p>
     <div class="d-flex flex-wrap gap-2">
       {% for t in my_teams %}
-        <span class="badge bg-light text-dark border">
+        <a href="{{ url_for('cleaning.team_members', team_id=t.id) }}"
+           class="badge bg-light text-dark border text-decoration-none team-badge-link"
+           title="See {{ t.name }} members">
           <i class="bi bi-people"></i> {{ t.name }}
-        </span>
+          <i class="bi bi-chevron-right small"></i>
+        </a>
       {% endfor %}
     </div>
   </div>
@@ -46,17 +50,29 @@
               <h5 class="mb-1">{{ s.title }}</h5>
               <div class="text-muted small">
                 <i class="bi bi-calendar"></i>
-                {{ s.scheduled_date.strftime('%b %d, %Y') }}
+                {{ s.date_range_label }}
                 {% if s.start_time %}
                   · {{ s.start_time }}{% if s.end_time %}–{{ s.end_time }}{% endif %}
                 {% endif %}
                 <span class="mx-1">·</span>
-                <i class="bi bi-people"></i> {{ s.team_name }}
+                <a href="{{ url_for('cleaning.team_members', team_id=s.team_id) }}"
+                   class="text-decoration-none">
+                  <i class="bi bi-people"></i> {{ s.team_name }}
+                </a>
                 {% if s.location %}
                   <span class="mx-1">·</span>
                   <i class="bi bi-geo-alt"></i> {{ s.location }}
                 {% endif %}
               </div>
+              {% if s.postpone_count and s.postpone_count > 0 %}
+                <div class="text-muted small mt-1">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                  Rescheduled by staff
+                  {% if s.postpone_note %}
+                    — <span class="fst-italic">"{{ s.postpone_note }}"</span>
+                  {% endif %}
+                </div>
+              {% endif %}
             </div>
             <div class="d-flex flex-wrap gap-1 align-items-start">
               <span class="badge {{ s.status_badge_class }}">{{ s.status_label }}</span>
@@ -108,7 +124,7 @@
                         </div>
                       {% endif %}
                     </div>
-                    {% if s.status == 'scheduled'
+                    {% if s.is_active
                           and t.status in ('assigned', 'marked_done')
                           and s.team_id in my_team_ids %}
                       <form method="post"

@@ -3,8 +3,9 @@
 
 {% block content %}
 <p class="text-muted">
-  Build cleaning teams and schedule sessions with subtasks. A session
-  auto-completes when every subtask is verified.
+  Build cleaning teams and schedule sessions with subtasks over a date
+  range. Sessions move to <em>Awaiting approval</em> once the team finishes,
+  then need a staff <em>Approve</em> to close out.
 </p>
 
 <ul class="nav nav-tabs mb-3" role="tablist">
@@ -38,12 +39,12 @@
         {% else %}
         <form method="post" action="{{ url_for('cleaning.add_session') }}">
           <div class="row g-2">
-            <div class="col-md-5">
+            <div class="col-md-6">
               <label class="form-label">Title</label>
               <input class="form-control" name="title" required
                      placeholder="e.g. Friday lounge tidy">
             </div>
-            <div class="col-md-3">
+            <div class="col-md-6">
               <label class="form-label">Team</label>
               <select class="form-select" name="team_id" required>
                 <option value="" disabled selected>Choose a team…</option>
@@ -52,16 +53,24 @@
                 {% endfor %}
               </select>
             </div>
-            <div class="col-md-2">
-              <label class="form-label">Date</label>
-              <input class="form-control" type="date" name="scheduled_date" required>
+          </div>
+
+          <div class="row g-2 mt-1">
+            <div class="col-md-3">
+              <label class="form-label">Start date</label>
+              <input class="form-control" type="date" name="start_date" required>
             </div>
-            <div class="col-md-1">
-              <label class="form-label">Start</label>
+            <div class="col-md-3">
+              <label class="form-label">End date</label>
+              <input class="form-control" type="date" name="end_date">
+              <div class="form-text">Leave blank for a single-day session.</div>
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Start time (optional)</label>
               <input class="form-control" type="time" name="start_time">
             </div>
-            <div class="col-md-1">
-              <label class="form-label">End</label>
+            <div class="col-md-3">
+              <label class="form-label">End time (optional)</label>
               <input class="form-control" type="time" name="end_time">
             </div>
           </div>
@@ -130,7 +139,7 @@
                 <h5 class="mb-1">{{ s.title }}</h5>
                 <div class="text-muted small">
                   <i class="bi bi-calendar"></i>
-                  {{ s.scheduled_date.strftime('%b %d, %Y') }}
+                  {{ s.date_range_label }}
                   {% if s.start_time %}
                     · {{ s.start_time }}{% if s.end_time %}–{{ s.end_time }}{% endif %}
                   {% endif %}
@@ -141,6 +150,24 @@
                     <i class="bi bi-geo-alt"></i> {{ s.location }}
                   {% endif %}
                 </div>
+                {% if s.postpone_count and s.postpone_count > 0 %}
+                  <div class="text-muted small mt-1">
+                    <i class="bi bi-arrow-counterclockwise"></i>
+                    Postponed {{ s.postpone_count }} time{{ '' if s.postpone_count == 1 else 's' }}
+                    {% if s.postpone_note %}
+                      — <span class="fst-italic">"{{ s.postpone_note }}"</span>
+                    {% endif %}
+                  </div>
+                {% endif %}
+                {% if s.status == 'approved' and s.approved_by_name %}
+                  <div class="text-muted small mt-1">
+                    <i class="bi bi-check-circle"></i>
+                    Approved by {{ s.approved_by_name }}
+                    {% if s.approved_at %}
+                      · {{ s.approved_at.strftime('%b %d · %H:%M') }}
+                    {% endif %}
+                  </div>
+                {% endif %}
               </div>
               <div class="d-flex flex-wrap gap-1 align-items-start">
                 <span class="badge {{ s.status_badge_class }}">{{ s.status_label }}</span>
@@ -243,7 +270,20 @@
                 </button>
               </form>
 
-              {% if s.status == 'scheduled' %}
+              {% if s.status not in ('approved', 'cancelled') %}
+                <button class="btn btn-sm btn-outline-info" type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#postpone-{{ s.id }}">
+                  <i class="bi bi-arrow-counterclockwise"></i> Postpone
+                </button>
+                <form method="post"
+                      action="{{ url_for('cleaning.approve_session', sess_id=s.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Approve this session? This will verify any remaining subtasks.');">
+                  <button class="btn btn-sm btn-success" type="submit">
+                    <i class="bi bi-check-circle"></i> Approve
+                  </button>
+                </form>
                 <form method="post"
                       action="{{ url_for('cleaning.cancel_session', sess_id=s.id) }}"
                       class="d-inline">
@@ -261,6 +301,41 @@
                 </button>
               </form>
             </div>
+
+            {# ---- Postpone form (collapsed by default) ---- #}
+            {% if s.status not in ('approved', 'cancelled') %}
+              <div class="collapse mt-3" id="postpone-{{ s.id }}">
+                <form method="post"
+                      action="{{ url_for('cleaning.postpone_session', sess_id=s.id) }}"
+                      class="bg-light p-3 rounded border">
+                  <div class="row g-2 align-items-end">
+                    <div class="col-md-3">
+                      <label class="form-label small">New start date</label>
+                      <input class="form-control form-control-sm" type="date"
+                             name="start_date" required
+                             value="{{ (s.start_date or s.scheduled_date).isoformat() }}">
+                    </div>
+                    <div class="col-md-3">
+                      <label class="form-label small">New end date</label>
+                      <input class="form-control form-control-sm" type="date"
+                             name="end_date"
+                             value="{{ (s.end_date or s.scheduled_date).isoformat() }}">
+                    </div>
+                    <div class="col-md-4">
+                      <label class="form-label small">Note (optional)</label>
+                      <input class="form-control form-control-sm" name="postpone_note"
+                             placeholder="e.g. Team busy with exams"
+                             value="{{ s.postpone_note or '' }}">
+                    </div>
+                    <div class="col-md-2">
+                      <button class="btn btn-info btn-sm w-100" type="submit">
+                        <i class="bi bi-arrow-counterclockwise"></i> Postpone
+                      </button>
+                    </div>
+                  </div>
+                </form>
+              </div>
+            {% endif %}
           </div>
         </article>
       {% endfor %}

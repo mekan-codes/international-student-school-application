@@ -66,14 +66,16 @@ def _student_team_ids(user_id: int) -> list[int]:
     )]
 
 
-def _maybe_complete_session(s: CleaningSession) -> None:
-    """If every task is verified_done, flip the session to completed."""
-    if s.status != "scheduled":
+def _maybe_team_done(s: CleaningSession) -> None:
+    """Flip the session to `marked_done` (awaiting staff approval) once every
+    subtask has been either marked_done or verified_done. Only applies to
+    sessions still in an active state — never overrides approved/cancelled."""
+    if s.status not in CleaningSession.ACTIVE_STATUSES:
         return
     if not s.tasks:
         return
-    if all(t.status == "verified_done" for t in s.tasks):
-        s.status = "completed"
+    if s.all_tasks_done:
+        s.status = "marked_done"
         s.updated_at = datetime.utcnow()
 
 
@@ -100,8 +102,12 @@ def _staff_view():
     q = CleaningSession.query
     if status_f in CleaningSession.STATUSES:
         q = q.filter(CleaningSession.status == status_f)
-    sessions = (q.order_by(CleaningSession.scheduled_date.desc(),
-                           CleaningSession.created_at.desc()).all())
+    # Order by start_date when present (new sessions), falling back to
+    # the legacy single-day field.
+    sessions = (q.order_by(
+        db.func.coalesce(CleaningSession.start_date,
+                         CleaningSession.scheduled_date).desc(),
+        CleaningSession.created_at.desc()).all())
 
     # Roster of all student users for the team-builder dropdowns.
     students = (User.query.filter_by(role="student")
@@ -124,8 +130,10 @@ def _student_view():
     if team_ids:
         sessions = (CleaningSession.query
                     .filter(CleaningSession.team_id.in_(team_ids))
-                    .order_by(CleaningSession.scheduled_date.desc(),
-                              CleaningSession.created_at.desc()).all())
+                    .order_by(
+                        db.func.coalesce(CleaningSession.start_date,
+                                         CleaningSession.scheduled_date).desc(),
+                        CleaningSession.created_at.desc()).all())
         my_teams = (CleaningTeam.query
                     .filter(CleaningTeam.id.in_(team_ids))
                     .order_by(CleaningTeam.name).all())
@@ -136,6 +144,46 @@ def _student_view():
         "cleaning/student.html",
         sessions=sessions, my_teams=my_teams,
         my_team_ids=set(team_ids),
+    )
+
+
+# --------------------------------------------------------------------------- #
+# Team detail (members) — clickable team badge                                #
+# --------------------------------------------------------------------------- #
+@cleaning_bp.route("/teams/<int:team_id>/members")
+@login_required
+def team_members(team_id):
+    """Render the member list of a single team.
+
+    Authorization:
+      - Staff can view any team.
+      - A student can view a team only if they're on it (so other teams'
+        members and phone numbers stay private).
+    """
+    team = db.session.get(CleaningTeam, team_id) or abort(404)
+
+    if not current_user.is_staff:
+        is_member = (CleaningTeamMember.query
+                     .filter_by(team_id=team.id,
+                                student_user_id=current_user.id)
+                     .first()) is not None
+        if not is_member:
+            abort(403)
+
+    # Pull in the underlying user rows so we can show student_id and respect
+    # each member's `show_phone_number` privacy toggle.
+    member_rows = []
+    for m in team.members:
+        u = db.session.get(User, m.student_user_id)
+        member_rows.append({
+            "name": m.student_name,
+            "student_id": (u.student_id if u else None),
+            "phone_number": (u.phone_number if u and u.show_phone_number else None),
+        })
+
+    return render_template(
+        "cleaning/_team_members.html",
+        team=team, members=member_rows,
     )
 
 
@@ -227,11 +275,14 @@ def _sync_team_members(team: CleaningTeam, student_id_strings: list[str]) -> Non
 def delete_team(team_id):
     team = db.session.get(CleaningTeam, team_id) or abort(404)
     open_sessions = (CleaningSession.query
-                     .filter_by(team_id=team.id, status="scheduled")
+                     .filter(CleaningSession.team_id == team.id,
+                             CleaningSession.status.in_(
+                                 list(CleaningSession.ACTIVE_STATUSES)
+                                 + ["marked_done"]))
                      .count())
     if open_sessions:
-        flash("This team still has scheduled cleaning sessions. "
-              "Cancel or complete them first.", "danger")
+        flash("This team still has open cleaning sessions. "
+              "Cancel or approve them first.", "danger")
         return redirect(url_for("cleaning.index"))
     name = team.name
     db.session.delete(team)
@@ -250,7 +301,8 @@ def add_session():
     description = (request.form.get("description") or "").strip() or None
     location = (request.form.get("location") or "").strip() or None
     team_id_raw = (request.form.get("team_id") or "").strip()
-    scheduled = _parse_date(request.form.get("scheduled_date"))
+    start_date = _parse_date(request.form.get("start_date"))
+    end_date = _parse_date(request.form.get("end_date"))
     start = (request.form.get("start_time") or "").strip() or None
     end = (request.form.get("end_time") or "").strip() or None
     raw_tasks = request.form.get("tasks") or ""
@@ -267,8 +319,14 @@ def add_session():
     if not team:
         flash("That team no longer exists.", "danger")
         return redirect(url_for("cleaning.index"))
-    if scheduled is None:
-        flash("Please choose a scheduled date.", "danger")
+    if start_date is None:
+        flash("Please choose a start date.", "danger")
+        return redirect(url_for("cleaning.index"))
+    # If end date is omitted, treat the session as a single-day event.
+    if end_date is None:
+        end_date = start_date
+    if end_date < start_date:
+        flash("End date can't be earlier than the start date.", "danger")
         return redirect(url_for("cleaning.index"))
 
     # Tasks: one per non-empty line.
@@ -280,7 +338,10 @@ def add_session():
     s = CleaningSession(
         title=title, description=description, location=location,
         team_id=team.id, team_name=team.name,
-        scheduled_date=scheduled, start_time=start, end_time=end,
+        # Keep `scheduled_date` in lock-step with start_date for back-compat.
+        scheduled_date=start_date,
+        start_date=start_date, end_date=end_date,
+        start_time=start, end_time=end,
         status="scheduled",
         created_by_user_id=current_user.id,
     )
@@ -300,7 +361,8 @@ def edit_session(sess_id):
     title = (request.form.get("title") or s.title).strip()
     description = (request.form.get("description") or "").strip() or None
     location = (request.form.get("location") or "").strip() or None
-    scheduled = _parse_date(request.form.get("scheduled_date"))
+    start_date = _parse_date(request.form.get("start_date"))
+    end_date = _parse_date(request.form.get("end_date"))
     start = (request.form.get("start_time") or "").strip() or None
     end = (request.form.get("end_time") or "").strip() or None
     team_id_raw = (request.form.get("team_id") or "").strip()
@@ -308,8 +370,13 @@ def edit_session(sess_id):
     if not title:
         flash("Session title cannot be empty.", "danger")
         return redirect(url_for("cleaning.index"))
-    if scheduled is None:
-        flash("Scheduled date is required.", "danger")
+    if start_date is None:
+        flash("Start date is required.", "danger")
+        return redirect(url_for("cleaning.index"))
+    if end_date is None:
+        end_date = start_date
+    if end_date < start_date:
+        flash("End date can't be earlier than the start date.", "danger")
         return redirect(url_for("cleaning.index"))
 
     if team_id_raw:
@@ -326,7 +393,9 @@ def edit_session(sess_id):
     s.title = title
     s.description = description
     s.location = location
-    s.scheduled_date = scheduled
+    s.scheduled_date = start_date
+    s.start_date = start_date
+    s.end_date = end_date
     s.start_time = start
     s.end_time = end
     db.session.commit()
@@ -345,6 +414,72 @@ def cancel_session(sess_id):
     s.updated_at = datetime.utcnow()
     db.session.commit()
     flash(f"Cancelled session: {s.title}.", "info")
+    return redirect(url_for("cleaning.index"))
+
+
+@cleaning_bp.route("/sessions/<int:sess_id>/postpone", methods=["POST"])
+@staff_required
+def postpone_session(sess_id):
+    """Move an active session to a new date range. Bumps `postpone_count`
+    and stores an optional staff note describing the reason."""
+    s = db.session.get(CleaningSession, sess_id) or abort(404)
+    if s.status in ("approved", "cancelled"):
+        flash("This session is already closed and can't be postponed.",
+              "warning")
+        return redirect(url_for("cleaning.index"))
+
+    new_start = _parse_date(request.form.get("start_date"))
+    new_end = _parse_date(request.form.get("end_date"))
+    note = (request.form.get("postpone_note") or "").strip() or None
+
+    if new_start is None:
+        flash("Please choose a new start date for the postponement.", "danger")
+        return redirect(url_for("cleaning.index"))
+    if new_end is None:
+        new_end = new_start
+    if new_end < new_start:
+        flash("End date can't be earlier than the start date.", "danger")
+        return redirect(url_for("cleaning.index"))
+
+    s.start_date = new_start
+    s.end_date = new_end
+    s.scheduled_date = new_start  # keep legacy column aligned
+    s.status = "postponed"
+    s.postpone_count = (s.postpone_count or 0) + 1
+    s.postpone_note = note
+    s.last_postponed_at = datetime.utcnow()
+    s.updated_at = datetime.utcnow()
+    db.session.commit()
+    flash(f"Postponed session: {s.title} → {s.date_range_label}.", "info")
+    return redirect(url_for("cleaning.index"))
+
+
+@cleaning_bp.route("/sessions/<int:sess_id>/approve", methods=["POST"])
+@staff_required
+def approve_session(sess_id):
+    """Sign off on the team's work. Any subtasks still in 'marked_done' get
+    auto-verified so the session lands in a clean, fully-verified state."""
+    s = db.session.get(CleaningSession, sess_id) or abort(404)
+    if s.status == "approved":
+        flash("Session is already approved.", "info")
+        return redirect(url_for("cleaning.index"))
+    if s.status == "cancelled":
+        flash("Cancelled sessions can't be approved.", "warning")
+        return redirect(url_for("cleaning.index"))
+
+    now = datetime.utcnow()
+    for t in s.tasks:
+        if t.status in ("assigned", "marked_done"):
+            t.status = "verified_done"
+            t.verified_by_user_id = current_user.id
+            t.verified_by_name = current_user.name
+            t.verified_at = now
+    s.status = "approved"
+    s.approved_at = now
+    s.approved_by_name = current_user.name
+    s.updated_at = now
+    db.session.commit()
+    flash(f"Approved session: {s.title}.", "success")
     return redirect(url_for("cleaning.index"))
 
 
@@ -372,8 +507,9 @@ def add_task(sess_id):
         return redirect(url_for("cleaning.index"))
     db.session.add(CleaningTask(session_id=s.id, task_name=name))
     s.updated_at = datetime.utcnow()
-    # Adding a new task may un-complete a session.
-    if s.status == "completed":
+    # Adding a new (still-assigned) task should re-open a session that had
+    # auto-flipped to "marked_done" — there's now unfinished work again.
+    if s.status == "marked_done":
         s.status = "scheduled"
     db.session.commit()
     flash(f"Added subtask “{name}”.", "success")
@@ -388,7 +524,7 @@ def delete_task(task_id):
     db.session.delete(t)
     db.session.flush()
     db.session.refresh(s)
-    _maybe_complete_session(s)
+    _maybe_team_done(s)
     db.session.commit()
     flash("Deleted subtask.", "info")
     return redirect(url_for("cleaning.index"))
@@ -404,7 +540,7 @@ def mark_done(task_id):
     if current_user.is_staff:
         flash("Staff verify tasks rather than mark them done.", "info")
         return redirect(url_for("cleaning.index"))
-    if s.status != "scheduled":
+    if s.status not in CleaningSession.ACTIVE_STATUSES:
         flash("This session is not active for student updates.", "warning")
         return redirect(url_for("cleaning.index"))
 
@@ -425,6 +561,9 @@ def mark_done(task_id):
     t.marked_done_by_user_id = current_user.id
     t.marked_done_by_name = current_user.name
     t.marked_done_at = datetime.utcnow()
+    # If this was the last outstanding subtask, flip the whole session over
+    # to "marked_done" so staff can review/approve.
+    _maybe_team_done(s)
     db.session.commit()
     flash(f"Marked “{t.task_name}” as done. Awaiting verification.", "success")
     return redirect(url_for("cleaning.index"))
@@ -444,7 +583,7 @@ def verify_task(task_id):
     t.verified_by_user_id = current_user.id
     t.verified_by_name = current_user.name
     t.verified_at = datetime.utcnow()
-    _maybe_complete_session(t.session)
+    _maybe_team_done(t.session)
     db.session.commit()
     flash(f"Verified “{t.task_name}”.", "success")
     return redirect(url_for("cleaning.index"))

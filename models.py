@@ -158,7 +158,8 @@ class Announcement(db.Model):
     __tablename__ = "announcements"
 
     PRIORITIES = ("normal", "important", "urgent")
-    AUDIENCES = ("everyone", "all_students", "sub_food_students", "staff_only")
+    AUDIENCES = ("everyone", "all_students", "sub_food_students",
+                 "staff_only", "specific_students")
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(160), nullable=False)
@@ -184,6 +185,11 @@ class Announcement(db.Model):
         backref="announcement",
         cascade="all, delete-orphan",
     )
+    recipients = db.relationship(
+        "AnnouncementRecipient",
+        backref="announcement",
+        cascade="all, delete-orphan",
+    )
 
     # ----- Visibility helper (DB-side filter) -----
     @classmethod
@@ -193,6 +199,7 @@ class Announcement(db.Model):
         - Students never see unpublished announcements.
         - Audience filter is applied in SQL — never in Python — so large
           announcement tables stay efficient.
+        - For `specific_students`, only the listed recipients see the post.
         """
         q = cls.query
         if user is None or not user.is_authenticated:
@@ -206,9 +213,23 @@ class Announcement(db.Model):
         allowed = ["everyone", "all_students"]
         if user.is_sub_food_member:
             allowed.append("sub_food_students")
+
+        # `specific_students` is allowed only when this user has a row in the
+        # AnnouncementRecipient join table. We OR that into the audience filter
+        # by building a subquery — single SQL round-trip, indexed lookup.
+        recipient_ids = (db.session.query(AnnouncementRecipient.announcement_id)
+                         .filter(AnnouncementRecipient.student_user_id == user.id))
         return (q.filter_by(is_published=True)
-                 .filter(cls.target_audience.in_(allowed))
+                 .filter(db.or_(
+                     cls.target_audience.in_(allowed),
+                     db.and_(cls.target_audience == "specific_students",
+                             cls.id.in_(recipient_ids)),
+                 ))
                  .order_by(cls.created_at.desc()))
+
+    def recipient_user_ids(self) -> list[int]:
+        """Helper for the staff edit form: which student ids are selected."""
+        return [r.student_user_id for r in self.recipients]
 
     # ----- Display helpers (used by templates) -----
     @property
@@ -231,7 +252,13 @@ class Announcement(db.Model):
             "all_students": "All students",
             "sub_food_students": "Sub-food students",
             "staff_only": "Staff only",
+            "specific_students": "Specific students",
         }.get(self.target_audience, self.target_audience)
+
+    @property
+    def recipient_names(self) -> list[str]:
+        """Display names of the targeted students (snapshot at post time)."""
+        return [r.student_name for r in self.recipients]
 
     def reaction_counts(self) -> dict:
         """{emoji: count} dict — O(n) over this announcement's reactions."""
@@ -267,6 +294,27 @@ class AnnouncementReaction(db.Model):
     __table_args__ = (
         db.UniqueConstraint("announcement_id", "user_id",
                             name="uq_user_announcement_reaction"),
+    )
+
+
+class AnnouncementRecipient(db.Model):
+    """Targeted recipient of an announcement when its `target_audience` is
+    `specific_students`. Acts as a join table between announcements and the
+    student users picked by staff, with a name snapshot for history."""
+    __tablename__ = "announcement_recipients"
+
+    id = db.Column(db.Integer, primary_key=True)
+    announcement_id = db.Column(
+        db.Integer, db.ForeignKey("announcements.id"), nullable=False)
+    student_user_id = db.Column(
+        db.Integer, db.ForeignKey("users.id"), nullable=False)
+    # Snapshot of the student's display name at post time.
+    student_name = db.Column(db.String(120), nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("announcement_id", "student_user_id",
+                            name="uq_announcement_recipient"),
     )
 
 
@@ -459,10 +507,23 @@ class CleaningTeamMember(db.Model):
 
 class CleaningSession(db.Model):
     """A scheduled cleaning event for one team, broken down into subtasks.
-    Becomes 'completed' automatically when all subtasks are verified_done."""
+
+    V3.1 workflow:
+      scheduled  → students can mark subtasks done
+      marked_done → all subtasks done by team, awaiting staff approval
+      approved   → staff has signed off, session is closed
+      postponed  → staff rescheduled to a new date range; students can
+                   keep working (treated like `scheduled` for actions)
+      cancelled  → session won't run
+
+    `start_date`/`end_date` model the date *range* a session can be worked
+    on. `scheduled_date` is kept for backward compatibility (mirrors
+    `start_date`)."""
     __tablename__ = "cleaning_sessions"
 
-    STATUSES = ("scheduled", "completed", "cancelled")
+    STATUSES = ("scheduled", "marked_done", "approved", "postponed", "cancelled")
+    # Statuses where students can still mark subtasks done.
+    ACTIVE_STATUSES = ("scheduled", "postponed")
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(160), nullable=False)
@@ -474,11 +535,22 @@ class CleaningSession(db.Model):
     # Snapshot of the team name at session-creation time.
     team_name = db.Column(db.String(120), nullable=False)
 
+    # Legacy single-day field, kept in sync with start_date for back-compat.
     scheduled_date = db.Column(db.Date, nullable=False)
+    # New date-range fields.
+    start_date = db.Column(db.Date, nullable=True)
+    end_date = db.Column(db.Date, nullable=True)
     start_time = db.Column(db.String(10), nullable=True)  # "HH:MM"
     end_time = db.Column(db.String(10), nullable=True)
 
     status = db.Column(db.String(20), nullable=False, default="scheduled")
+
+    # Postpone bookkeeping (additive; never required for legacy rows).
+    postpone_count = db.Column(db.Integer, nullable=False, default=0)
+    postpone_note = db.Column(db.Text, nullable=True)
+    last_postponed_at = db.Column(db.DateTime, nullable=True)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    approved_by_name = db.Column(db.String(120), nullable=True)
 
     created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
                                    nullable=False)
@@ -495,16 +567,39 @@ class CleaningSession(db.Model):
 
     @property
     def status_label(self) -> str:
-        return {"scheduled": "Scheduled", "completed": "Completed",
-                "cancelled": "Cancelled"}.get(self.status, self.status.title())
+        return {
+            "scheduled": "Scheduled",
+            "marked_done": "Awaiting approval",
+            "approved": "Approved",
+            "postponed": "Postponed",
+            "cancelled": "Cancelled",
+        }.get(self.status, self.status.title())
 
     @property
     def status_badge_class(self) -> str:
         return {
             "scheduled": "bg-secondary",
-            "completed": "bg-success",
+            "marked_done": "bg-warning text-dark",
+            "approved": "bg-success",
+            "postponed": "bg-info text-dark",
             "cancelled": "bg-danger",
         }.get(self.status, "bg-secondary")
+
+    @property
+    def is_active(self) -> bool:
+        """Students can interact with the session in this state."""
+        return self.status in self.ACTIVE_STATUSES
+
+    @property
+    def date_range_label(self) -> str:
+        """Human-readable date range. Falls back to legacy single date."""
+        s = self.start_date or self.scheduled_date
+        e = self.end_date or self.scheduled_date
+        if s == e:
+            return s.strftime("%b %d, %Y")
+        if s.year == e.year:
+            return f"{s.strftime('%b %d')} – {e.strftime('%b %d, %Y')}"
+        return f"{s.strftime('%b %d, %Y')} – {e.strftime('%b %d, %Y')}"
 
     @property
     def task_progress(self) -> tuple[int, int]:
@@ -512,6 +607,15 @@ class CleaningSession(db.Model):
         total = len(self.tasks)
         verified = sum(1 for t in self.tasks if t.status == "verified_done")
         return verified, total
+
+    @property
+    def all_tasks_done(self) -> bool:
+        """True when every subtask is either marked_done or verified_done.
+        Empty task lists return False so a brand-new session doesn't auto-flip."""
+        if not self.tasks:
+            return False
+        return all(t.status in ("marked_done", "verified_done")
+                   for t in self.tasks)
 
 
 class CleaningTask(db.Model):

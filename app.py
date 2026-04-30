@@ -16,6 +16,7 @@ from announcements import announcements_bp
 from requests_bp import requests_bp
 from borrowing import borrowing_bp
 from cleaning import cleaning_bp
+from resources import resources_bp
 from seed import seed_database
 
 
@@ -61,11 +62,54 @@ def _migrate_schema() -> None:
                 "ALTER TABLE inventory_logs ADD COLUMN locker_qty_after INTEGER"
             )
 
+    # V3.1 cleaning workflow: date range + postpone/approve bookkeeping.
+    backfill_cleaning_dates = False
+    if "cleaning_sessions" in table_names:
+        sess_cols = {c["name"] for c in inspector.get_columns("cleaning_sessions")}
+        if "start_date" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN start_date DATE")
+            backfill_cleaning_dates = True
+        if "end_date" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN end_date DATE")
+            backfill_cleaning_dates = True
+        if "postpone_count" not in sess_cols:
+            statements.append(
+                "ALTER TABLE cleaning_sessions "
+                "ADD COLUMN postpone_count INTEGER NOT NULL DEFAULT 0"
+            )
+        if "postpone_note" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN postpone_note TEXT")
+        if "last_postponed_at" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN last_postponed_at DATETIME")
+        if "approved_at" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN approved_at DATETIME")
+        if "approved_by_name" not in sess_cols:
+            statements.append("ALTER TABLE cleaning_sessions ADD COLUMN approved_by_name VARCHAR(120)")
+
     if not statements:
         return
     with db.engine.begin() as conn:
         for stmt in statements:
             conn.execute(text(stmt))
+        # Backfill the new date-range columns from the legacy single-day
+        # `scheduled_date` so existing demo sessions render correctly.
+        if backfill_cleaning_dates:
+            conn.execute(text(
+                "UPDATE cleaning_sessions "
+                "SET start_date = scheduled_date "
+                "WHERE start_date IS NULL"
+            ))
+            conn.execute(text(
+                "UPDATE cleaning_sessions "
+                "SET end_date = scheduled_date "
+                "WHERE end_date IS NULL"
+            ))
+        # Migrate any pre-existing 'completed' sessions to the new 'approved'
+        # terminal state so the UI keeps showing them as done.
+        conn.execute(text(
+            "UPDATE cleaning_sessions SET status = 'approved' "
+            "WHERE status = 'completed'"
+        ))
 
 
 def create_app():
@@ -99,6 +143,7 @@ def create_app():
     app.register_blueprint(requests_bp, url_prefix="/requests")
     app.register_blueprint(borrowing_bp, url_prefix="/borrowing")
     app.register_blueprint(cleaning_bp, url_prefix="/cleaning")
+    app.register_blueprint(resources_bp, url_prefix="/resources")
 
     # ----- Root route: redirect based on role -----
     @app.route("/")
