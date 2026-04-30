@@ -43,12 +43,13 @@
         </div>
         <div class="col-md-5 mb-3">
           <label class="form-label">Target audience</label>
-          <select class="form-select" name="target_audience">
+          <select class="form-select" name="target_audience" id="target_audience">
             {% set labels = {
               'everyone': 'Everyone',
               'all_students': 'All students',
               'sub_food_students': 'Sub-food students only',
               'staff_only': 'Staff only',
+              'specific_students': 'Specific students…',
             } %}
             {% for a in audiences %}
               <option value="{{ a }}"
@@ -73,6 +74,37 @@
         </div>
       </div>
 
+      {# ---- Specific-students picker (only relevant when audience is 'specific_students') ---- #}
+      <div id="specific-recipients-block"
+           class="mb-3"
+           {% if not (announcement and announcement.target_audience == 'specific_students') %}
+             style="display:none;"
+           {% endif %}>
+        <label class="form-label">
+          Pick the students who should see this announcement
+        </label>
+        {% if not students %}
+          <div class="text-muted small">No student accounts available yet.</div>
+        {% else %}
+          <div class="row g-2 student-picker">
+            {% for u in students %}
+              <div class="col-md-4 col-sm-6">
+                <label class="member-pill">
+                  <input type="checkbox" name="recipient_ids" value="{{ u.id }}"
+                         {% if u.id in selected_recipient_ids %}checked{% endif %}>
+                  <span>
+                    {{ u.name }}{% if u.student_id %} ({{ u.student_id }}){% endif %}
+                  </span>
+                </label>
+              </div>
+            {% endfor %}
+          </div>
+        {% endif %}
+        <div class="form-text">
+          Only the selected students will see this post in their feed.
+        </div>
+      </div>
+
       <div class="d-flex gap-2">
         <button class="btn btn-primary" type="submit">
           <i class="bi bi-check-lg"></i>
@@ -84,4 +116,21 @@
     </form>
   </div>
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+  // Show/hide the specific-students picker based on the audience dropdown.
+  // Pure DOM — no AJAX involved.
+  (function () {
+    const sel = document.getElementById('target_audience');
+    const block = document.getElementById('specific-recipients-block');
+    if (!sel || !block) return;
+    function sync() {
+      block.style.display = (sel.value === 'specific_students') ? '' : 'none';
+    }
+    sel.addEventListener('change', sync);
+    sync();
+  })();
+</script>
 {% endblock %}

@@ -71,15 +71,23 @@
           <i class="bi bi-envelope-paper"></i> Requests
         </a>
 
-        <div class="nav-section">Coming soon</div>
-        <a href="{{ url_for('coming_soon', module='borrowing') }}" class="coming-soon-link">
-          <i class="bi bi-bag"></i> Borrowing <span class="badge-soon">soon</span>
+        <div class="nav-section">Lounge life</div>
+        <a href="{{ url_for('borrowing.index') }}"
+           class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
+          <i class="bi bi-bag"></i> Borrowing
         </a>
+        <a href="{{ url_for('cleaning.index') }}"
+           class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
+          <i class="bi bi-droplet"></i> Cleaning
+        </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
+        </a>
+
+        <div class="nav-section">Coming soon</div>
         <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
           <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
-        </a>
-        <a href="{{ url_for('coming_soon', module='cleaning') }}" class="coming-soon-link">
-          <i class="bi bi-droplet"></i> Cleaning Sessions <span class="badge-soon">soon</span>
         </a>
       </nav>
     {% else %}
@@ -107,15 +115,23 @@
           <i class="bi bi-envelope-paper"></i> Requests
         </a>
 
-        <div class="nav-section">Coming soon</div>
-        <a href="{{ url_for('coming_soon', module='borrowing') }}" class="coming-soon-link">
-          <i class="bi bi-bag"></i> Borrowing <span class="badge-soon">soon</span>
+        <div class="nav-section">Lounge life</div>
+        <a href="{{ url_for('borrowing.index') }}"
+           class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
+          <i class="bi bi-bag"></i> Borrowing
         </a>
+        <a href="{{ url_for('cleaning.index') }}"
+           class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
+          <i class="bi bi-droplet"></i> Cleaning
+        </a>
+        <a href="{{ url_for('resources.index') }}"
+           class="{% if request.blueprint == 'resources' %}active{% endif %}">
+          <i class="bi bi-folder2-open"></i> Resources
+        </a>
+
+        <div class="nav-section">Coming soon</div>
         <a href="{{ url_for('coming_soon', module='chat') }}" class="coming-soon-link">
           <i class="bi bi-chat-dots"></i> Group Chat <span class="badge-soon">soon</span>
-        </a>
-        <a href="{{ url_for('coming_soon', module='cleaning') }}" class="coming-soon-link">
-          <i class="bi bi-droplet"></i> Cleaning Sessions <span class="badge-soon">soon</span>
         </a>
       </nav>
     {% endif %}

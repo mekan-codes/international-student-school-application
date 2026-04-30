@@ -17,7 +17,7 @@ from flask import (
 )
 from flask_login import login_required, current_user
 
-from models import db, Announcement, AnnouncementReaction
+from models import db, Announcement, AnnouncementReaction, AnnouncementRecipient, User
 
 announcements_bp = Blueprint("announcements", __name__)
 
@@ -49,6 +49,11 @@ def list_view():
 # --------------------------------------------------------------------------- #
 # Staff management                                                             #
 # --------------------------------------------------------------------------- #
+def _all_students():
+    """Roster used by the specific-students multi-select picker."""
+    return (User.query.filter_by(role="student").order_by(User.name).all())
+
+
 @announcements_bp.route("/new", methods=["GET", "POST"])
 @staff_required
 def new():
@@ -59,6 +64,8 @@ def new():
         announcement=None,
         priorities=Announcement.PRIORITIES,
         audiences=Announcement.AUDIENCES,
+        students=_all_students(),
+        selected_recipient_ids=set(),
     )
 
 
@@ -73,6 +80,8 @@ def edit(ann_id):
         announcement=a,
         priorities=Announcement.PRIORITIES,
         audiences=Announcement.AUDIENCES,
+        students=_all_students(),
+        selected_recipient_ids=set(a.recipient_user_ids()),
     )
 
 
@@ -144,6 +153,7 @@ def _save_form(*, announcement):
     priority = (request.form.get("priority") or "normal").strip()
     audience = (request.form.get("target_audience") or "everyone").strip()
     publish_now = bool(request.form.get("is_published"))
+    recipient_ids_raw = request.form.getlist("recipient_ids")
 
     if not title:
         flash("Title is required.", "danger")
@@ -158,6 +168,28 @@ def _save_form(*, announcement):
         flash("Unknown target audience.", "danger")
         return redirect(request.url)
 
+    # When the audience is `specific_students`, validate + resolve the
+    # picked student rows up-front so we can fail fast with a clear error.
+    chosen_students: list[User] = []
+    if audience == "specific_students":
+        wanted_ids: set[int] = set()
+        for raw in recipient_ids_raw:
+            try:
+                wanted_ids.add(int(raw))
+            except (TypeError, ValueError):
+                continue
+        if not wanted_ids:
+            flash("Pick at least one student for a targeted announcement.",
+                  "danger")
+            return redirect(request.url)
+        chosen_students = (User.query
+                           .filter(User.id.in_(wanted_ids),
+                                   User.role == "student").all())
+        if not chosen_students:
+            flash("None of the selected recipients are valid students.",
+                  "danger")
+            return redirect(request.url)
+
     if announcement is None:
         announcement = Announcement(
             title=title, content=content,
@@ -167,6 +199,7 @@ def _save_form(*, announcement):
             author_name=current_user.name,
         )
         db.session.add(announcement)
+        db.session.flush()  # populate announcement.id
         flash(f'Announcement "{title}" created.', "success")
     else:
         announcement.title = title
@@ -177,5 +210,30 @@ def _save_form(*, announcement):
         announcement.updated_at = datetime.utcnow()
         flash(f'Announcement "{title}" updated.', "success")
 
+    # Sync the recipient join-table rows to match the picked audience.
+    _sync_recipients(announcement, chosen_students if audience == "specific_students" else [])
+
     db.session.commit()
     return redirect(url_for("announcements.list_view"))
+
+
+def _sync_recipients(ann: Announcement, students: list[User]) -> None:
+    """Ensure `ann.recipients` exactly matches the given student list.
+    Removes stale rows when the audience flips away from specific_students."""
+    # Hash sets give O(1) "is wanted?" / "is existing?" lookups.
+    wanted_ids = {u.id for u in students}
+    existing_by_uid = {r.student_user_id: r for r in ann.recipients}
+
+    # Remove rows that are no longer wanted.
+    for uid, row in list(existing_by_uid.items()):
+        if uid not in wanted_ids:
+            db.session.delete(row)
+
+    # Add new ones.
+    for u in students:
+        if u.id not in existing_by_uid:
+            db.session.add(AnnouncementRecipient(
+                announcement_id=ann.id,
+                student_user_id=u.id,
+                student_name=u.name,
+            ))

@@ -317,14 +317,13 @@ carry short comments naming the data structure they use and why:
 
 ## 10. Future expansion
 
-Sidebar placeholders for the following modules; they all currently render
-a "Coming soon" page.
+The remaining sidebar placeholder is a single "Coming soon" page:
 
-| Module                        | New routes               |
-|-------------------------------|--------------------------|
-| Borrowing system              | `/borrowing/...`         |
-| Common Group Chat             | `/chat/...`              |
-| Cleaning Sessions             | `/cleaning/...`          |
+| Module                        | New routes               | Status |
+|-------------------------------|--------------------------|--------|
+| Common Group Chat             | `/chat/...`              | Coming soon |
+| Borrowing system              | `/borrowing/...`         | **Implemented in V3** |
+| Cleaning sessions             | `/cleaning/...`          | **Implemented in V3** |
 
 Each module follows the same blueprint pattern as the food module.
 
@@ -427,3 +426,270 @@ The requests blueprint is registered under the name `"requests"` so
 `url_for("requests.list_view")` works from anywhere. The implementation
 file is named **`requests_bp.py`** to avoid shadowing the popular
 `requests` PyPI library if it is ever installed for HTTP work.
+
+---
+
+## 12. Version 3 features (implemented)
+
+V3 ships two new modules on top of V2: **Borrowing** and **Cleaning
+teams + sessions**.
+
+### 12.1 Permission matrix
+
+| Feature                                              | Admin | Manager | Sub-food Student | Std. Student |
+|------------------------------------------------------|:-----:|:-------:|:----------------:|:------------:|
+| View borrowable item catalog                         |   ✅   |    ✅   |        ✅         |       ✅      |
+| Create / edit / activate borrowable items            |   ✅   |    ✅   |        —         |       —      |
+| Submit borrow request                                |   —   |    —   |        ✅         |       ✅      |
+| Approve / reject / mark returned                     |   ✅   |    ✅   |        —         |       —      |
+| View own borrow requests                             |   —   |    —   |        ✅         |       ✅      |
+| Create / edit cleaning teams                         |   ✅   |    ✅   |        —         |       —      |
+| Create / edit / cancel sessions                      |   ✅   |    ✅   |        —         |       —      |
+| Add / delete subtasks on a session                   |   ✅   |    ✅   |        —         |       —      |
+| Tick own team's subtask as done (with note)          |   —   |    —   |        ✅¹        |       ✅¹     |
+| Verify subtask / mark missed                         |   ✅   |    ✅   |        —         |       —      |
+
+¹ Only for sessions whose team they belong to.
+
+### 12.2 Data model (additions)
+
+Six new tables, all auto-created via `db.create_all()` on first start —
+no schema migration is needed.
+
+- **`borrowable_items`** — `id`, `name` (unique), `category`,
+  `description`, `total_quantity`, `available_quantity`, `is_active`,
+  `created_at`. Stock invariant `0 ≤ available ≤ total` enforced
+  in the route handlers.
+- **`borrow_requests`** — `id`, `student_id` → `users.id`,
+  `student_name` (snapshot), `item_id` → `borrowable_items.id`,
+  `item_name` (snapshot), `quantity`, `borrow_until_date`,
+  `status` (`pending`/`approved`/`rejected`/`returned`),
+  `student_note`, `staff_note`, `handled_by_id` → `users.id`,
+  `handled_by_name` (snapshot), `handled_at`, `created_at`,
+  `updated_at`.
+- **`cleaning_teams`** — `id`, `name` (unique), `description`,
+  `is_active`, `created_at`.
+- **`cleaning_team_members`** — composite-PK join table
+  (`team_id`, `student_id`).
+- **`cleaning_sessions`** — `id`, `team_id` → `cleaning_teams.id`,
+  `team_name` (snapshot), `title`, `scheduled_date`, `start_time`,
+  `end_time`, `location`, `status` (`scheduled`/`in_progress`/
+  `completed`/`cancelled`), `notes`, `created_at`, `updated_at`.
+- **`cleaning_tasks`** — `id`, `session_id` → `cleaning_sessions.id`,
+  `description`, `assigned_student_id` → `users.id` (nullable),
+  `student_name` (snapshot), `status` (`assigned`/`marked_done`/
+  `verified_done`/`marked_missed`), `student_note`,
+  `marked_done_at`, `verified_by_id` → `users.id`,
+  `handled_by_name` (snapshot), `verified_at`, `created_at`,
+  `updated_at`.
+
+### 12.3 Routes
+
+**Borrowing** (blueprint `borrowing`, mount `/borrowing`):
+
+| Method | Path                              | Who      | Purpose                          |
+|-------:|-----------------------------------|----------|----------------------------------|
+| GET    | `/`                               | All      | Staff catalog/queue OR student feed |
+| POST   | `/items/add`                      | Staff    | Create borrowable item           |
+| POST   | `/items/<id>/edit`                | Staff    | Edit item                        |
+| POST   | `/items/<id>/delete`              | Staff    | Delete (only if no requests)     |
+| POST   | `/request`                        | Student  | Submit a borrow request          |
+| POST   | `/requests/<id>/approve`          | Staff    | Approve (decrement available)    |
+| POST   | `/requests/<id>/reject`           | Staff    | Reject (no stock change)         |
+| POST   | `/requests/<id>/return`           | Staff    | Mark returned (restore stock)    |
+
+**Cleaning** (blueprint `cleaning`, mount `/cleaning`):
+
+| Method | Path                                  | Who    | Purpose                               |
+|-------:|---------------------------------------|--------|---------------------------------------|
+| GET    | `/`                                   | All    | Staff admin OR student team-feed      |
+| POST   | `/teams/add`                          | Staff  | Create team + initial members         |
+| POST   | `/teams/<id>/edit`                    | Staff  | Rename / sync members (set diff)      |
+| POST   | `/teams/<id>/delete`                  | Staff  | Delete (cascades to sessions/tasks)   |
+| POST   | `/sessions/add`                       | Staff  | Schedule session + parse subtasks     |
+| POST   | `/sessions/<id>/edit`                 | Staff  | Edit session metadata                 |
+| POST   | `/sessions/<id>/cancel`               | Staff  | Cancel a session                      |
+| POST   | `/sessions/<id>/tasks/add`            | Staff  | Add a subtask                         |
+| POST   | `/tasks/<id>/delete`                  | Staff  | Remove a subtask                      |
+| POST   | `/tasks/<id>/mark-done`               | Member | Tick own team's subtask + note        |
+| POST   | `/tasks/<id>/verify`                  | Staff  | Verify a subtask                      |
+| POST   | `/tasks/<id>/missed`                  | Staff  | Mark a subtask as missed              |
+
+### 12.4 Auto-completion rule
+
+After every staff verification on a `cleaning_task`, the parent session
+is checked: if **all** its tasks are `verified_done`, the session's
+`status` flips to `completed` automatically — no manual "complete
+session" button is needed.
+
+### 12.5 Snapshot history
+
+To keep history readable when names change or accounts are deleted,
+both modules write the relevant display name into the row at action
+time:
+
+- `borrow_requests` stores `student_name`, `item_name`,
+  `handled_by_name`.
+- `cleaning_sessions` stores `team_name`.
+- `cleaning_tasks` stores `student_name`, `handled_by_name`.
+
+These are presentational only — the foreign keys remain authoritative.
+
+### 12.6 Data structures used
+
+- **Hash-set diff for team membership.** Editing a team computes
+  `current_set` and `desired_set` of student IDs and applies the
+  symmetric difference to `cleaning_team_members`, so a single edit
+  costs O(|added| + |removed|) instead of O(|all|²).
+- **Set membership for student access.** The student cleaning view
+  uses an `in` test against the team's member set to decide whether
+  to render *Mark done* — O(1) per lookup.
+- **SQL aggregates for queue counters.** Pending borrow request and
+  open cleaning task counts are computed with `COUNT(*)` queries
+  rather than loading rows into Python.
+
+---
+
+## 13. Version 3.1 features (implemented)
+
+V3.1 is a focused polish pass on top of V3 modules (no new top-level
+features). It targets four pain points that surfaced in real use:
+
+1. Staff couldn't send an announcement to a hand-picked subset of
+   students.
+2. Cleaning sessions only had a single date, so multi-day cleans had
+   to be split into multiple records.
+3. There was no formal staff sign-off step — a session was either
+   "in progress" or "completed", with no way to postpone or to signal
+   "team finished, awaiting verification".
+4. Students could see only their own teams' names but had no way to
+   look up team members' contact info, and there was no central page
+   for external resources.
+
+### 13.1 Targeted announcements (`specific_students`)
+
+- New audience value `specific_students` added to
+  `Announcement.AUDIENCES`.
+- New table `announcement_recipients`:
+  - `id` (PK), `announcement_id` (FK → `announcements.id`,
+    cascade delete), `user_id` (FK → `users.id`).
+  - Composite unique index on `(announcement_id, user_id)`.
+- `Announcement.recipients` relationship is `lazy="selectin"` so the
+  list endpoint doesn't N+1 when rendering recipient names.
+- `Announcement.visible_to(user)` is extended with an OR-clause: a
+  student sees the announcement if they are one of the recipients,
+  on top of the existing audience checks.
+- Staff form (`templates/announcements/form.html`) shows an inline
+  multi-select student picker only when `specific_students` is the
+  selected audience. A small JS toggle hides/shows the picker.
+- Staff list (`templates/announcements/staff_list.html`) shows a
+  *Sent to:* row with each recipient name as a small badge.
+
+### 13.2 Cleaning sessions — date range + approval workflow
+
+Schema additions on `cleaning_sessions`:
+
+| Column                 | Type     | Default | Notes                                         |
+|------------------------|----------|---------|-----------------------------------------------|
+| `start_date`           | DATE     | —       | Required; replaces `scheduled_date` for UX.   |
+| `end_date`             | DATE     | NULL    | Optional; same-day if NULL.                   |
+| `postpone_count`       | INTEGER  | 0       | Increments on each postpone.                  |
+| `postpone_note`        | TEXT     | NULL    | Most recent postpone reason.                  |
+| `last_postponed_at`    | DATETIME | NULL    | Timestamp of most recent postpone.            |
+| `approved_at`          | DATETIME | NULL    | Set when staff clicks Approve.                |
+| `approved_by_name`     | STRING   | NULL    | Snapshot of approver's display name.          |
+
+The legacy `scheduled_date` column is preserved. The startup
+`_migrate_schema` ALTERs new columns onto existing SQLite databases
+and backfills `start_date := scheduled_date` (and `end_date := NULL`).
+Old rows with `status = 'completed'` are migrated to
+`status = 'approved'`.
+
+`CleaningSession.STATUSES`:
+
+| status        | meaning                                              |
+|---------------|------------------------------------------------------|
+| `scheduled`   | Newly created.                                       |
+| `marked_done` | Auto-flip: every subtask is done, awaiting approval. |
+| `approved`    | Staff clicked Approve; remaining tasks auto-verified.|
+| `postponed`   | Staff pushed it to a new date range.                 |
+| `cancelled`   | Manually cancelled.                                  |
+
+`ACTIVE_STATUSES = ('scheduled', 'postponed')` — the only states in
+which students may mark subtasks done. (`marked_done` is awaiting
+approval and locks further student edits unless staff add a new
+subtask, which reopens the session.)
+
+### 13.3 Cleaning team detail page
+
+- New route `GET /cleaning/teams/<team_id>/members`.
+- Authorization:
+  - Staff (admin or manager) can view any team.
+  - A student can view a team only if there's a row in
+    `cleaning_team_members` with their `user_id` for that team. All
+    other team views return HTTP 403.
+- The page lists each member's `student_name`, `student_id`, and
+  `phone_number` — the phone number is suppressed if the member's
+  `show_phone_number` flag is `false`. This re-uses the existing V1
+  privacy toggle so contact info honours each student's setting.
+
+### 13.4 Resources page
+
+- New blueprint `resources` mounted at `/resources`. The page is
+  protected by `@login_required` only — every signed-in role can see
+  it.
+- Renders two hardcoded "card" links. Each anchor uses
+  `target="_blank" rel="noopener"` so the lounge dashboard stays open.
+- Sidebar gets a *Resources* entry under the *Lounge Life* group for
+  both staff and students.
+
+### 13.5 Sidebar reorganization
+
+The sidebar (`templates/base.html`) now has three labelled groups:
+
+- **Communication** — Announcements, Requests.
+- **Lounge Life** — Borrowing, Cleaning, Resources, plus food/locker
+  links.
+- **Coming Soon** — Common Group Chat (only remaining stub).
+
+Staff sidebar items previously labelled *Manage Borrowing* / *Manage
+Cleaning* are shortened to *Borrowing* / *Cleaning* — the staff role
+context already implies management, and matching labels for staff and
+students keeps the UI consistent.
+
+### 13.6 Cleaning routes (V3.1 additions)
+
+| Method | Path                                  | Who       | Purpose                                                                  |
+|-------:|---------------------------------------|-----------|--------------------------------------------------------------------------|
+| GET    | `/teams/<id>/members`                 | Staff/Mem | Render the team's member list (privacy-aware phone numbers).             |
+| POST   | `/sessions/<id>/postpone`             | Staff     | Push session to new `start_date`/`end_date`, increment `postpone_count`. |
+| POST   | `/sessions/<id>/approve`              | Staff     | Auto-verify remaining tasks, set `approved`, snapshot approver.          |
+
+The pre-existing `/sessions/add` and `/sessions/<id>/edit` routes now
+accept `start_date` and `end_date` instead of a single
+`scheduled_date`, with server-side validation that
+`end_date >= start_date`.
+
+### 13.7 Manual test summary
+
+All flows below were exercised against a freshly migrated SQLite DB
+and the `Start application` workflow.
+
+- **Targeted announcement** — admin posts to *Specific students*
+  including only S001 and S003. S002 does not see it; S001 and S003
+  do; staff list shows *Sent to: Student One, Student Three*.
+- **Cleaning approve** — admin clicks *Approve* on an active session
+  with mixed verified/non-verified subtasks. All subtasks flip to
+  *Verified*; status becomes *Approved* with `approved_by_name`
+  rendered under the date.
+- **Cleaning postpone** — admin clicks *Postpone* with a new end
+  date and a note. Status becomes *Postponed*, `postpone_count`
+  becomes 1, the note appears under the date row, and the team can
+  still mark subtasks done.
+- **Team detail (staff)** — admin opens
+  `/cleaning/teams/<id>/members` for an arbitrary team and sees every
+  member's name, student ID, and phone (where the member opted in).
+- **Team detail (privacy)** — a student that is **not** a member of
+  the team gets HTTP 403 from the same URL.
+- **Resources** — both an admin and a student can open `/resources/`;
+  both cards render and open in a new browser tab.

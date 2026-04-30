@@ -512,6 +512,65 @@ a { text-decoration: none; }
 /* Request card */
 .request-card .badge { font-weight: 500; }
 
+/* =============================================================
+   V3: Borrowing & Cleaning
+   ============================================================= */
+
+/* Borrowing item cards (student view) */
+.borrow-item-card {
+  border-radius: 10px;
+  transition: box-shadow 0.12s, border-color 0.12s;
+}
+.borrow-item-card:hover {
+  box-shadow: 0 4px 14px rgba(79,70,229,0.08);
+  border-color: #c7d2fe;
+}
+
+/* Cleaning session card */
+.cleaning-session-card { border-left: 3px solid var(--primary); }
+.cleaning-session-card.cleaning-cancelled {
+  border-left-color: #d1d5db;
+  background: #fafafa;
+  opacity: 0.85;
+}
+
+/* Subtask checklist */
+.task-list { list-style: none; padding-left: 0; margin: 0; }
+.task-item {
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  margin-bottom: 0.4rem;
+  background: var(--surface);
+}
+.task-item.task-verified_done { background: #f0fdf4; border-color: #bbf7d0; }
+.task-item.task-marked_done { background: #fffbeb; border-color: #fde68a; }
+.task-item.task-missed { background: #fef2f2; border-color: #fecaca; }
+
+/* Member picker checkboxes */
+.student-picker .member-pill {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: background 0.12s, border-color 0.12s;
+  margin: 0;
+}
+.student-picker .member-pill:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+.student-picker .member-pill input { margin: 0; }
+.student-picker .member-pill input:checked + span {
+  color: var(--primary-dark);
+  font-weight: 600;
+}
+
 /* Recent-announcements widget shown on the dashboard */
 .recent-ann-item {
   display: block;
@@ -525,3 +584,35 @@ a { text-decoration: none; }
 .recent-ann-item:hover { background: #f8fafc; border-color: #c7d2fe; color: var(--text); }
 .recent-ann-item .recent-ann-title { font-weight: 600; }
 .recent-ann-item .recent-ann-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+
+/* V3.1: Resources page cards */
+.resource-card {
+  transition: border-color 0.12s, transform 0.12s, box-shadow 0.12s;
+}
+.resource-card:hover {
+  border-color: var(--primary);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+}
+.resource-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  background: #eef2ff;
+  color: var(--primary-dark);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.4rem;
+  flex-shrink: 0;
+}
+
+/* V3.1: Clickable team badge in the student cleaning view */
+.team-badge-link {
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+.team-badge-link:hover {
+  background: #eef2ff !important;
+  border-color: #c7d2fe !important;
+  color: var(--primary-dark) !important;
+}

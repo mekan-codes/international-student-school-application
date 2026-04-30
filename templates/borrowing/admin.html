@@ -1,0 +1,281 @@
+{% extends "base.html" %}
+{% block title %}Manage Borrowing{% endblock %}
+
+{% block content %}
+<p class="text-muted">
+  Manage shared borrowable items and triage student requests.
+</p>
+
+{# ---- Items management ---- #}
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <strong><i class="bi bi-bag"></i> Borrowable items</strong>
+    <button class="btn btn-sm btn-primary" type="button"
+            data-bs-toggle="collapse" data-bs-target="#addItemForm">
+      <i class="bi bi-plus-lg"></i> Add item
+    </button>
+  </div>
+
+  <div class="collapse" id="addItemForm">
+    <div class="card-body border-bottom bg-light">
+      <form method="post" action="{{ url_for('borrowing.add_item') }}">
+        <div class="row g-2 align-items-end">
+          <div class="col-md-3">
+            <label class="form-label">Name</label>
+            <input class="form-control" name="name" required>
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Category</label>
+            <input class="form-control" name="category" placeholder="general">
+          </div>
+          <div class="col-md-4">
+            <label class="form-label">Description</label>
+            <input class="form-control" name="description"
+                   placeholder="Optional description">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Total qty</label>
+            <input class="form-control" type="number" name="total_quantity"
+                   min="1" value="1" required>
+          </div>
+          <div class="col-md-1">
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" name="is_active"
+                     id="newActive" checked>
+              <label class="form-check-label small" for="newActive">Active</label>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-primary mt-3" type="submit">
+          <i class="bi bi-check-lg"></i> Create
+        </button>
+      </form>
+    </div>
+  </div>
+
+  {% if not items %}
+    <div class="card-body text-center py-4 text-muted">
+      No borrowable items yet. Click <em>Add item</em> to create the first one.
+    </div>
+  {% else %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th class="text-end">Available / Total</th>
+            <th>Status</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for it in items %}
+          <tr>
+            <td>
+              <div class="fw-semibold">{{ it.name }}</div>
+              {% if it.description %}
+                <div class="text-muted small">{{ it.description }}</div>
+              {% endif %}
+            </td>
+            <td><span class="badge bg-light text-dark border">{{ it.category }}</span></td>
+            <td class="text-end">
+              <span class="fw-semibold
+                          {% if it.available_quantity == 0 %}text-danger
+                          {% elif it.available_quantity < it.total_quantity %}text-warning
+                          {% else %}text-success{% endif %}">
+                {{ it.available_quantity }}
+              </span>
+              <span class="text-muted">/ {{ it.total_quantity }}</span>
+            </td>
+            <td>
+              {% if it.is_active %}
+                <span class="badge bg-success">Active</span>
+              {% else %}
+                <span class="badge bg-secondary">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <button class="btn btn-sm btn-outline-secondary" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#editItem{{ it.id }}">
+                <i class="bi bi-pencil"></i>
+              </button>
+              <form method="post" class="d-inline"
+                    action="{{ url_for('borrowing.delete_item', item_id=it.id) }}"
+                    onsubmit="return confirm('Delete {{ it.name }}? This cannot be undone.');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </td>
+          </tr>
+          <tr class="collapse" id="editItem{{ it.id }}">
+            <td colspan="5" class="bg-light">
+              <form method="post"
+                    action="{{ url_for('borrowing.edit_item', item_id=it.id) }}">
+                <div class="row g-2 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label small">Name</label>
+                    <input class="form-control form-control-sm" name="name"
+                           value="{{ it.name }}" required>
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">Category</label>
+                    <input class="form-control form-control-sm" name="category"
+                           value="{{ it.category }}">
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label small">Description</label>
+                    <input class="form-control form-control-sm" name="description"
+                           value="{{ it.description or '' }}">
+                  </div>
+                  <div class="col-md-2">
+                    <label class="form-label small">Total qty</label>
+                    <input class="form-control form-control-sm" type="number"
+                           name="total_quantity" min="0"
+                           value="{{ it.total_quantity }}" required>
+                  </div>
+                  <div class="col-md-1">
+                    <div class="form-check mt-3">
+                      <input class="form-check-input" type="checkbox"
+                             name="is_active" id="active{{ it.id }}"
+                             {% if it.is_active %}checked{% endif %}>
+                      <label class="form-check-label small"
+                             for="active{{ it.id }}">Active</label>
+                    </div>
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-sm mt-2" type="submit">
+                  <i class="bi bi-check-lg"></i> Save
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+
+{# ---- Requests ---- #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <strong><i class="bi bi-clipboard-check"></i> Borrow requests</strong>
+    <form method="get" class="d-flex gap-2">
+      <select class="form-select form-select-sm" name="status"
+              onchange="this.form.submit()">
+        <option value="">All statuses</option>
+        {% for s in statuses %}
+          <option value="{{ s }}" {% if status_f == s %}selected{% endif %}>
+            {{ s.title() }}
+          </option>
+        {% endfor %}
+      </select>
+      {% if status_f %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ url_for('borrowing.index') }}">
+          <i class="bi bi-x-lg"></i>
+        </a>
+      {% endif %}
+    </form>
+  </div>
+
+  {% if not rows %}
+    <div class="card-body text-center py-4 text-muted">
+      No borrow requests
+      {% if status_f %} with status “{{ status_f }}”{% endif %}.
+    </div>
+  {% else %}
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Submitted</th>
+            <th>Student</th>
+            <th>Item</th>
+            <th class="text-end">Qty</th>
+            <th>Return by</th>
+            <th>Status</th>
+            <th>Handled by</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+          <tr>
+            <td class="text-muted small">
+              {{ r.requested_at.strftime('%b %d, %Y · %H:%M') }}
+            </td>
+            <td>{{ r.student_name }}</td>
+            <td>{{ r.item_name }}</td>
+            <td class="text-end fw-semibold">{{ r.quantity }}</td>
+            <td>{{ r.borrow_until_date.strftime('%b %d, %Y') }}</td>
+            <td><span class="badge {{ r.status_badge_class }}">{{ r.status_label }}</span></td>
+            <td class="text-muted small">{{ r.handled_by_name or '—' }}</td>
+            <td class="text-end">
+              {% if r.status == 'pending' %}
+                <button class="btn btn-sm btn-outline-primary" type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#req{{ r.id }}">
+                  Review
+                </button>
+              {% elif r.status == 'approved' %}
+                <form method="post" class="d-inline"
+                      action="{{ url_for('borrowing.mark_returned', req_id=r.id) }}">
+                  <button class="btn btn-sm btn-success" type="submit">
+                    <i class="bi bi-arrow-counterclockwise"></i> Mark returned
+                  </button>
+                </form>
+              {% else %}
+                —
+              {% endif %}
+            </td>
+          </tr>
+          {% if r.status == 'pending' %}
+          <tr class="collapse" id="req{{ r.id }}">
+            <td colspan="8" class="bg-light">
+              <div class="d-flex flex-wrap gap-3">
+                <form method="post"
+                      action="{{ url_for('borrowing.approve', req_id=r.id) }}"
+                      class="d-flex gap-2 align-items-end">
+                  <div>
+                    <label class="form-label small mb-1">Note (optional)</label>
+                    <input class="form-control form-control-sm" name="staff_note"
+                           placeholder="e.g. pickup at front desk">
+                  </div>
+                  <button class="btn btn-sm btn-success" type="submit">
+                    <i class="bi bi-check-circle"></i> Approve
+                  </button>
+                </form>
+                <form method="post"
+                      action="{{ url_for('borrowing.reject', req_id=r.id) }}"
+                      class="d-flex gap-2 align-items-end">
+                  <div>
+                    <label class="form-label small mb-1">Reason (optional)</label>
+                    <input class="form-control form-control-sm" name="staff_note"
+                           placeholder="e.g. out of stock today">
+                  </div>
+                  <button class="btn btn-sm btn-outline-danger" type="submit">
+                    <i class="bi bi-x-circle"></i> Reject
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {% endif %}
+          {% if r.staff_note %}
+          <tr>
+            <td colspan="8" class="text-muted small ps-4">
+              <i class="bi bi-chat-left-text"></i> {{ r.staff_note }}
+            </td>
+          </tr>
+          {% endif %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

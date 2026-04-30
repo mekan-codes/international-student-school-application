@@ -18,19 +18,35 @@
 app.py            entry / app factory + coming-soon route + schema migration
 models.py         User, FoodItem, ... + V2: Announcement,
                   AnnouncementReaction, SupportRequest
+                  + V3: BorrowableItem, BorrowRequest,
+                        CleaningTeam, CleaningTeamMember,
+                        CleaningSession, CleaningTask
+                  + V3.1: AnnouncementRecipient (targeted DMs)
 auth.py           login (by email or student_id) / register / logout
 admin.py          admin & manager blueprint (mounted at /admin)
 student.py        student blueprint (general dashboard + food page)
 profile.py        /settings (profile + password); /profile → /settings
 announcements.py  V2 — staff CRUD + student feed + emoji reactions
+                  V3.1 — adds `specific_students` audience that
+                  routes via AnnouncementRecipient join rows
 requests_bp.py    V2 — student submit/list-own/detail + staff filtered
                   list/respond/status/delete. File is *_bp.py so it
                   doesn't shadow the `requests` PyPI library; the
                   blueprint name is "requests".
+borrowing.py      V3 — borrowable item catalog + request approve/reject/return
+cleaning.py       V3 — cleaning teams + sessions + subtask checklist
+                  V3.1 — date-range scheduling, postpone & approve,
+                  team-detail page with phone-privacy aware members
+resources.py      V3.1 — Resources page (curated external links;
+                  visible to all signed-in users)
 seed.py           demo data
-templates/        Jinja templates (now includes announcements/ and
-                  requests/ subfolders)
-static/css/       stylesheet (V2: announcement-card, reactions, etc.)
+templates/        Jinja templates (announcements/, requests/,
+                  borrowing/, cleaning/, plus V3.1 resources.html
+                  and cleaning/_team_members.html)
+static/css/       stylesheet (V3 adds task-list, member-pill,
+                  borrow-item-card, cleaning-session-card classes;
+                  V3.1 adds .resource-card / .resource-icon /
+                  .team-badge-link)
 docs/             project spec
 ```
 
@@ -99,8 +115,9 @@ You can sign in with the email or the student ID.
 - Admin dashboard: 3 most recent announcements + open-requests
   counter (statuses submitted + in_review).
 - Student dashboard: 3 most recent announcements visible to that
-  student (via `Announcement.visible_to(current_user)`); the
-  upcoming-features list now only shows Borrowing / Chat / Cleaning.
+  student (via `Announcement.visible_to(current_user)`); after V3
+  the dashboard also has Borrowing / Cleaning info tiles, and the
+  upcoming-features list only shows Common Group Chat.
 
 ### Sidebar
 - "Communication" section (Announcements + Requests) appears for
@@ -108,6 +125,132 @@ You can sign in with the email or the student ID.
   Coming-soon placeholders for those two were removed but
   `/coming-soon/<slug>` still resolves any unknown slug for
   back-compat.
+
+## V3 modules (Apr 2026)
+
+### Borrowing (`borrowing.py`, mount `/borrowing`)
+- Models: `BorrowableItem`, `BorrowRequest`.
+  - `BorrowableItem.available_quantity` is the source of truth; the
+    invariant `0 ≤ available ≤ total` is enforced in the routes.
+  - `BorrowRequest.STATUSES` = pending / approved / rejected /
+    returned. Snapshots `student_name`, `item_name`,
+    `handled_by_name` are stored so history survives renames.
+- Routes:
+  - `/` — staff catalog + queue, students see active items + own
+    requests.
+  - `/items/add`, `/items/<id>/edit`, `/items/<id>/delete` — staff.
+  - `/request` — student submits.
+  - `/requests/<id>/approve|reject|return` — staff.
+
+### Cleaning (`cleaning.py`, mount `/cleaning`)
+- Models: `CleaningTeam`, `CleaningTeamMember` (composite-PK join),
+  `CleaningSession`, `CleaningTask`.
+  - Subtask flow: assigned → marked_done (member) → verified_done
+    (staff). Staff may also mark missed.
+  - When all tasks in a session are verified, the session
+    auto-completes (in the `verify_task` handler).
+  - Team member sync uses a hash-set diff (current vs. desired set
+    of student IDs) so updates are O(|added|+|removed|).
+- Routes:
+  - `/` — staff admin (teams + sessions) OR student feed (only
+    sessions for teams the student belongs to).
+  - `/teams/add|<id>/edit|<id>/delete` — staff.
+  - `/sessions/add|<id>/edit|<id>/cancel` — staff.
+  - `/sessions/<id>/tasks/add`, `/tasks/<id>/delete` — staff.
+  - `/tasks/<id>/mark-done` — team member only.
+  - `/tasks/<id>/verify`, `/tasks/<id>/missed` — staff.
+
+### Sidebar (V3)
+- Borrowing & Cleaning replaced their Coming-soon stubs with real
+  links for staff *and* students. Common Group Chat is the only
+  remaining placeholder.
+
+## V3.1 modules (Apr 2026)
+
+### Targeted announcements (`specific_students` audience)
+- New `AnnouncementRecipient` join table — `(announcement_id,
+  user_id)` unique. The `Announcement.recipients` relationship
+  is `lazy="selectin"` and cascades on delete.
+- `Announcement.AUDIENCES` now includes `specific_students`.
+  `Announcement.visible_to(user)` adds an OR-clause: the user
+  sees the announcement if they're a chosen recipient.
+- Staff form (`templates/announcements/form.html`) shows a
+  multi-select student picker only when "Specific students" is
+  picked; tiny JS toggles the picker visibility on change.
+- Staff list shows a "Sent to:" row with each recipient name as
+  a small badge (`recipient_names` model helper).
+
+### Cleaning sessions — date range + approval workflow
+- `CleaningSession` gets `start_date`, `end_date`,
+  `postpone_count`, `postpone_note`, `last_postponed_at`,
+  `approved_at`, `approved_by_name`. The legacy
+  `scheduled_date` column is preserved for backwards
+  compatibility; the additive migration in `app._migrate_schema`
+  backfills the new columns from it.
+- `CleaningSession.STATUSES` =
+  scheduled / marked_done / approved / postponed / cancelled.
+  `ACTIVE_STATUSES` = ('scheduled', 'postponed') — the only
+  states students can act on.
+- Flow: students mark subtasks done → when every task is
+  `marked_done` or `verified_done` the session auto-flips to
+  `marked_done` (awaiting approval) via `_maybe_team_done`.
+  Staff click **Approve** (`/sessions/<id>/approve`), which
+  verifies any remaining subtasks, sets `status='approved'`,
+  and stamps `approved_by_name` + `approved_at`.
+- Staff can **Postpone** (`/sessions/<id>/postpone`) — accepts
+  new `start_date`/`end_date` (+ optional note), increments
+  `postpone_count`, sets status to `postponed`. Reopens the
+  session for the team.
+- Old `'completed'` rows are migrated to `'approved'` on
+  startup.
+- `date_range_label` renders "Apr 30, 2026" for single-day
+  sessions, "Apr 30 – May 2, 2026" for ranges.
+
+### Cleaning teams — clickable detail page
+- New route `/cleaning/teams/<id>/members` renders a small read-
+  only list (name, student ID, phone if `show_phone_number`).
+- Authorization: staff see any team; a student may only view a
+  team they're a member of (otherwise 403). This keeps other
+  teams' rosters and phone numbers private.
+- Both staff and student cleaning views link the team name to
+  this page via the `.team-badge-link` style.
+
+### Resources page (`resources.py`, mount `/resources`)
+- Two hardcoded "card" links rendered on a single page; opens in
+  a new tab (`target="_blank" rel="noopener"`). Visible to every
+  signed-in user (no role gating beyond `@login_required`).
+- Sidebar gets a Resources entry under Lounge Life for both
+  staff and students.
+
+### Sidebar reorganization (V3.1)
+- Sidebar now groups items into three labelled sections:
+  **Communication** (Announcements, Requests),
+  **Lounge Life** (Borrowing, Cleaning, Resources, food/locker
+  links), **Coming Soon** (Common Group Chat only).
+- Staff "Manage Borrowing" / "Manage Cleaning" labels were
+  shortened to **Borrowing** / **Cleaning** since the role
+  context already implies management.
+
+## Manual test summary (V3.1)
+
+Routes smoke-tested while logged in (admin + S001):
+- `GET /cleaning/` — admin board renders date-range form,
+  Approve / Postpone / Cancel buttons appear on active sessions,
+  postpone history shows under each session.
+- `GET /cleaning/teams/2/members` — admin sees full list with
+  student IDs & phone numbers (where `show_phone_number=True`).
+- `GET /cleaning/teams/2/members` as **non-member** student →
+  HTTP 403 (privacy guard works).
+- `GET /cleaning/` as student S001 — sees only their teams,
+  team badge links to the members page, date range label
+  rendered, "Mark done" available while status is
+  `scheduled` or `postponed`.
+- `GET /announcements/new` — "Specific students" option
+  appears, recipient picker toggles via JS on selection.
+- `GET /announcements/` (staff) — recipient names render as
+  badges under any specific-students post.
+- `GET /resources/` — two cards render and open in new tab;
+  reachable from sidebar by both staff and students.
 
 ## Recent changes
 - **Phone formatting** in Settings now uses `intl-tel-input` (CDN, no

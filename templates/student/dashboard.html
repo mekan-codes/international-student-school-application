@@ -71,6 +71,31 @@
   </div>
 </div>
 
+<div class="row g-3 mb-4">
+  <div class="col-md-6">
+    <a class="info-tile-link" href="{{ url_for('borrowing.index') }}">
+      <div class="info-tile">
+        <i class="bi bi-bag"></i>
+        <div>
+          <strong>Borrowing</strong>
+          <p>Borrow umbrellas, chargers, board games and more.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+  <div class="col-md-6">
+    <a class="info-tile-link" href="{{ url_for('cleaning.index') }}">
+      <div class="info-tile">
+        <i class="bi bi-droplet"></i>
+        <div>
+          <strong>Cleaning</strong>
+          <p>Sessions assigned to your team and your subtasks.</p>
+        </div>
+      </div>
+    </a>
+  </div>
+</div>
+
 <div class="card">
   <div class="card-body">
     <h5 class="card-title"><i class="bi bi-stars"></i> What's coming next</h5>
@@ -79,9 +104,7 @@
       Keep an eye on the sidebar:
     </p>
     <ul class="upcoming-list mb-0">
-      <li><i class="bi bi-bag"></i> Borrowing system</li>
       <li><i class="bi bi-chat-dots"></i> Common Group Chat</li>
-      <li><i class="bi bi-droplet"></i> Cleaning Sessions</li>
     </ul>
   </div>
 </div>

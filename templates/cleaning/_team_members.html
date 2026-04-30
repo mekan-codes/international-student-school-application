@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}{{ team.name }} · Members{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-3">
+  <div>
+    <h4 class="mb-1">
+      <i class="bi bi-people"></i> {{ team.name }}
+    </h4>
+    {% if team.description %}
+      <p class="text-muted mb-0">{{ team.description }}</p>
+    {% endif %}
+  </div>
+  <a class="btn btn-sm btn-outline-secondary"
+     href="{{ url_for('cleaning.index') }}">
+    <i class="bi bi-arrow-left"></i> Back to cleaning
+  </a>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    {% if not members %}
+      <p class="text-muted mb-0">This team doesn't have any members yet.</p>
+    {% else %}
+      <ul class="list-group list-group-flush">
+        {% for m in members %}
+          <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="fw-semibold">{{ m.name }}</div>
+              <div class="text-muted small">
+                {% if m.student_id %}
+                  <i class="bi bi-card-text"></i> {{ m.student_id }}
+                {% else %}
+                  <span class="fst-italic">No student ID on file</span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="text-end small">
+              {% if m.phone_number %}
+                <a class="text-decoration-none" href="tel:{{ m.phone_number }}">
+                  <i class="bi bi-telephone"></i> {{ m.phone_number }}
+                </a>
+              {% else %}
+                <span class="text-muted fst-italic">
+                  <i class="bi bi-telephone-x"></i> Phone hidden
+                </span>
+              {% endif %}
+            </div>
+          </li>
+        {% endfor %}
+      </ul>
+      <p class="text-muted small mb-0 mt-3">
+        Phone numbers are only shown for members who have chosen to share
+        them in their profile settings.
+      </p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

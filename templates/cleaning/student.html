@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Cleaning{% endblock %}
+
+{% block content %}
+{% if not my_teams %}
+  <div class="card">
+    <div class="card-body text-center py-5">
+      <i class="bi bi-droplet" style="font-size:2.5rem; color: var(--primary);"></i>
+      <h5 class="mt-3 mb-2">You're not on a cleaning team yet</h5>
+      <p class="text-muted mb-0">
+        When staff add you to a team, your cleaning sessions will appear here.
+      </p>
+    </div>
+  </div>
+{% else %}
+  <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <p class="text-muted mb-0">
+      Cleaning sessions assigned to your team
+      {% if my_teams|length > 1 %}s{% endif %}.
+      Tick subtasks as you finish — staff will verify and approve.
+      Tap a team to see who's on it.
+    </p>
+    <div class="d-flex flex-wrap gap-2">
+      {% for t in my_teams %}
+        <a href="{{ url_for('cleaning.team_members', team_id=t.id) }}"
+           class="badge bg-light text-dark border text-decoration-none team-badge-link"
+           title="See {{ t.name }} members">
+          <i class="bi bi-people"></i> {{ t.name }}
+          <i class="bi bi-chevron-right small"></i>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+
+  {% if not sessions %}
+    <div class="card">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-calendar-check" style="font-size:2rem;"></i>
+        <div class="mt-2">No sessions scheduled for your team yet.</div>
+      </div>
+    </div>
+  {% else %}
+    {% for s in sessions %}
+      {% set verified, total = s.task_progress %}
+      <article class="card mb-3 cleaning-session-card
+              {% if s.status == 'cancelled' %}cleaning-cancelled{% endif %}">
+        <div class="card-body">
+          <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+            <div>
+              <h5 class="mb-1">{{ s.title }}</h5>
+              <div class="text-muted small">
+                <i class="bi bi-calendar"></i>
+                {{ s.date_range_label }}
+                {% if s.start_time %}
+                  · {{ s.start_time }}{% if s.end_time %}–{{ s.end_time }}{% endif %}
+                {% endif %}
+                <span class="mx-1">·</span>
+                <a href="{{ url_for('cleaning.team_members', team_id=s.team_id) }}"
+                   class="text-decoration-none">
+                  <i class="bi bi-people"></i> {{ s.team_name }}
+                </a>
+                {% if s.location %}
+                  <span class="mx-1">·</span>
+                  <i class="bi bi-geo-alt"></i> {{ s.location }}
+                {% endif %}
+              </div>
+              {% if s.postpone_count and s.postpone_count > 0 %}
+                <div class="text-muted small mt-1">
+                  <i class="bi bi-arrow-counterclockwise"></i>
+                  Rescheduled by staff
+                  {% if s.postpone_note %}
+                    — <span class="fst-italic">"{{ s.postpone_note }}"</span>
+                  {% endif %}
+                </div>
+              {% endif %}
+            </div>
+            <div class="d-flex flex-wrap gap-1 align-items-start">
+              <span class="badge {{ s.status_badge_class }}">{{ s.status_label }}</span>
+              {% if total %}
+                <span class="badge bg-light text-dark border">
+                  {{ verified }}/{{ total }} verified
+                </span>
+              {% endif %}
+            </div>
+          </div>
+
+          {% if s.description %}
+            <p class="text-muted mt-2 mb-0">{{ s.description }}</p>
+          {% endif %}
+
+          {% if s.tasks %}
+            <hr class="my-3">
+            <ul class="task-list">
+              {% for t in s.tasks %}
+                <li class="task-item task-{{ t.status }}">
+                  <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                    <div>
+                      <i class="bi
+                                {% if t.status == 'verified_done' %}bi-check-circle-fill text-success
+                                {% elif t.status == 'marked_done' %}bi-clock-history text-warning
+                                {% elif t.status == 'missed' %}bi-x-circle-fill text-danger
+                                {% else %}bi-circle text-muted{% endif %}"></i>
+                      <span class="fw-semibold">{{ t.task_name }}</span>
+                      <span class="badge {{ t.status_badge_class }} ms-2">
+                        {{ t.status_label }}
+                      </span>
+                      {% if t.marked_done_by_name %}
+                        <div class="text-muted small ms-4">
+                          Marked done by {{ t.marked_done_by_name }}
+                          {% if t.marked_done_at %}
+                            · {{ t.marked_done_at.strftime('%b %d · %H:%M') }}
+                          {% endif %}
+                          {% if t.student_note %}
+                            <div class="fst-italic">"{{ t.student_note }}"</div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                      {% if t.verified_by_name %}
+                        <div class="text-muted small ms-4">
+                          Verified by {{ t.verified_by_name }}
+                          {% if t.verified_at %}
+                            · {{ t.verified_at.strftime('%b %d · %H:%M') }}
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    </div>
+                    {% if s.is_active
+                          and t.status in ('assigned', 'marked_done')
+                          and s.team_id in my_team_ids %}
+                      <form method="post"
+                            action="{{ url_for('cleaning.mark_done', task_id=t.id) }}"
+                            class="d-flex gap-2 align-items-center flex-wrap">
+                        <input class="form-control form-control-sm" name="student_note"
+                               placeholder="Optional note" style="max-width:240px;">
+                        <button class="btn btn-sm btn-outline-success" type="submit">
+                          <i class="bi bi-check2"></i>
+                          {% if t.status == 'marked_done' %}Update{% else %}Mark done{% endif %}
+                        </button>
+                      </form>
+                    {% endif %}
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      </article>
+    {% endfor %}
+  {% endif %}
+{% endif %}
+{% endblock %}
