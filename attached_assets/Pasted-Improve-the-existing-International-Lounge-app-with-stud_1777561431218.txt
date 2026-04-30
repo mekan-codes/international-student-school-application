@@ -1,0 +1,285 @@
+Improve the existing International Lounge app with student food pickup and final stability audit.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve current UI style, spacing, colors, sidebar logic, and role system.
+- Keep all existing V1, V2, and V3 features working.
+- Focus on substitute food locker pickup, naming cleanup, and final stability/permission audit.
+- Do not add common group chat yet.
+
+Current app context:
+International Lounge is a Flask + SQLite app for international students.
+Existing modules include:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile and phone privacy
+- substitute food management
+- warehouse/locker inventory
+- shareable food log
+- inventory history
+- announcements
+- requests
+- borrowing
+- cleaning teams/sessions
+- resources/common drives
+
+==================================================
+1. RENAME LOUNGE LOCKER
+==================================================
+
+Rename student-facing “Lounge Locker” to:
+
+Substitute Food Locker
+
+Use correct spelling:
+- Substitute Food Locker
+
+Update:
+- sidebar label
+- page title
+- card/header text
+- docs if needed
+
+Internal route/function names can stay unchanged if changing them is risky.
+
+==================================================
+2. STUDENT SELF-PICKUP FROM SUBSTITUTE FOOD LOCKER
+==================================================
+
+Currently students can only view available locker food.
+Allow substitute-food students to take food online directly from the Substitute Food Locker page.
+
+Rules:
+- Only students with substitute-food access can use this page.
+- Standard students must still not see or access this page.
+- Students cannot take more than available locker quantity.
+- Students cannot take zero or negative quantity.
+- If locker quantity becomes low, existing admin low-stock alerts should still work.
+- Every student pickup must update locker quantity.
+- Every student pickup must create inventory history/log entries.
+- Every student pickup must also appear in the Shareable Food Log / distribution log.
+
+Preferred UX:
+- Show available foods as cards or rows.
+- Each available food has a quantity input.
+- Use one main button:
+  Take selected food
+
+This allows a student to take multiple foods in one action.
+
+Example:
+Student selects:
+- Chicken Mayo: 1
+- Noodles: 1
+- Rice: 1
+
+After clicking Take selected food:
+- locker quantities decrease
+- one grouped pickup/distribution record is created
+- inventory log entries are created for each food item
+- success message:
+  You took Chicken Mayo × 1, Noodles × 1, Rice × 1.
+
+Grouped Shareable Food Log behavior:
+If a student takes multiple foods in one action, show it as one grouped pickup row, not three separate pickup sessions.
+
+Example:
+April 29, 2026 | Mekan | Chicken Mayo: 1, Noodles: 1, Rice: 1
+
+This should match the existing shareable food log format if possible.
+
+==================================================
+3. CONFIRMATION AND ERROR HANDLING
+==================================================
+
+Add protection against accidental pickup.
+
+Before final submission:
+- either show a confirmation dialog
+- or show a clear confirmation step if the existing UI pattern supports it
+
+Error messages:
+- If no food quantity selected:
+  Please select at least one food item.
+- If quantity exceeds available:
+  Only [number] available for [food name].
+- If quantity is invalid:
+  Quantity must be at least 1.
+- If student is not authorized:
+  You do not have access to this page.
+
+Use existing toast/flash style.
+Success messages should auto-dismiss as current app behavior supports.
+
+==================================================
+4. RECENTLY TAKEN BY ME
+==================================================
+
+On the Substitute Food Locker page, add a small section:
+
+Recently taken by me
+
+Show the student’s last 5 pickup records.
+
+Display:
+- date/time
+- grouped food items and quantities
+
+Example:
+Apr 30, 2026 16:20 — Chicken Mayo: 1, Noodles: 1
+
+If none:
+No pickup history yet.
+
+Do not show other students’ pickup history to students.
+
+==================================================
+5. ADMIN LOG SOURCE CLARITY
+==================================================
+
+In admin/manager logs or shareable food log, make it clear whether a pickup was:
+- recorded by staff
+- self-recorded by student
+
+Use a simple source label if the current schema allows it:
+- Staff recorded
+- Student pickup
+
+If schema changes are needed, add a safe field such as:
+source_type
+
+Possible values:
+- staff_recorded
+- student_self_pickup
+
+If adding this field is risky, use note text instead.
+
+==================================================
+6. FINAL STABILITY AND PERMISSION AUDIT
+==================================================
+
+After implementing the pickup feature, audit the whole app.
+
+Check role permissions:
+- admin
+- manager
+- standard student
+- substitute-food student
+
+Rules:
+- students must not access admin/manager pages
+- standard students must not see food pages
+- substitute-food students can see and use Substitute Food Locker
+- managers cannot perform restricted admin-only actions
+- protected admin accounts remain protected
+- last admin cannot be deleted or demoted
+
+Check sidebar visibility:
+Students:
+- Homepage
+- Announcements
+- Requests
+- Resources
+- Borrowing
+- Cleaning
+- Substitute Food Locker only if substitute-food student
+- Group Chat as Coming Soon only
+
+Admin/manager:
+- Homepage
+- Users
+- Food Items
+- Warehouse
+- Locker
+- Transfer Stock
+- Shareable Food Log
+- Inventory History
+- Announcements
+- Requests
+- Resources
+- Borrowing
+- Cleaning
+- Group Chat as Coming Soon only
+
+Check database consistency:
+- food warehouse quantity never below 0
+- food locker quantity never below 0
+- student pickup cannot overdraw locker stock
+- borrowing available_quantity never below 0
+- borrowing available_quantity never above total_quantity
+- cleaning session approval still works
+- announcement visibility respects target audience
+- resources only show active links to students
+
+Check forms and validation:
+- required fields
+- negative number prevention
+- invalid dates
+- empty titles/descriptions
+- invalid URLs
+- password confirmation
+- permission-safe actions
+
+Fix only real bugs found.
+Do not redesign the whole app.
+
+==================================================
+7. EMPTY STATES AND WORDING CLEANUP
+==================================================
+
+Add or confirm empty states:
+- no food currently available in Substitute Food Locker
+- no pickup history yet
+- no announcements
+- no requests
+- no borrowing requests
+- no cleaning sessions
+- no resources
+- no inventory history found
+
+Clean wording:
+- Use “Substitute Food Locker” for student-facing food page.
+- Avoid showing internal words like sub_food to students.
+- Avoid “program subscription” or “limited access”.
+- Keep internal code names unchanged if safer.
+
+==================================================
+8. DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Mention:
+- Substitute Food Locker rename
+- student self-pickup from locker
+- grouped pickup logging
+- Recently taken by me section
+- source label: staff recorded vs student pickup
+- final manual testing checklist
+
+Add or update “Final Manual Testing Checklist” with:
+1. admin flow
+2. manager flow
+3. standard student flow
+4. substitute-food student flow
+5. student food pickup flow
+6. shareable food log verification
+7. inventory history verification
+8. permissions check
+9. regression check for announcements, requests, borrowing, cleaning, resources
+
+==================================================
+9. AFTER FINISHING
+==================================================
+
+After finishing, summarize:
+1. files changed
+2. schema/database changes
+3. how student food pickup works
+4. how grouped pickup logging works
+5. how to test Substitute Food Locker
+6. how to test Shareable Food Log integration
+7. how to test inventory history integration
+8. bugs found and fixed during audit
+9. anything risky or still needing manual testing

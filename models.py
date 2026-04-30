@@ -113,7 +113,12 @@ class InventoryLog(db.Model):
 
 
 class Distribution(db.Model):
-    """A single 'pickup' event: one student takes one or more foods at once."""
+    """A single 'pickup' event: one student takes one or more foods at once.
+
+    source_type distinguishes how the record was created:
+      'staff_recorded'      — entered by a staff member on the admin page
+      'student_self_pickup' — submitted by the student on their own locker page
+    """
     __tablename__ = "distributions"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -123,6 +128,8 @@ class Distribution(db.Model):
     performed_by_user_name = db.Column(db.String(120), nullable=False)
     timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
     note = db.Column(db.String(255), nullable=True)
+    # Nullable for backward compat; defaults to staff_recorded for old rows.
+    source_type = db.Column(db.String(30), nullable=True, default="staff_recorded")
 
     items = db.relationship(
         "DistributionItem",

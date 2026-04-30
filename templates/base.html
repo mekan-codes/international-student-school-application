@@ -26,7 +26,7 @@
       <nav class="nav-list">
         <a href="{{ url_for('admin.dashboard') }}"
            class="{% if request.endpoint == 'admin.dashboard' %}active{% endif %}">
-          <i class="bi bi-speedometer2"></i> Homepage
+          <i class="bi bi-speedometer2"></i> Home
         </a>
 
         <div class="nav-section">Management</div>
@@ -68,21 +68,21 @@
         </a>
         <a href="{{ url_for('requests.list_view') }}"
            class="{% if request.blueprint == 'requests' %}active{% endif %}">
-          <i class="bi bi-envelope-paper"></i> Requests
+          <i class="bi bi-envelope-paper"></i> Intl Dept. Requests
         </a>
         <a href="{{ url_for('resources.index') }}"
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
-          <i class="bi bi-folder2-open"></i> Resources
+          <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
            class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
-          <i class="bi bi-bag"></i> Borrowing
+          <i class="bi bi-bag"></i> Shared Item Borrowing
         </a>
         <a href="{{ url_for('cleaning.index') }}"
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
-          <i class="bi bi-droplet"></i> Cleaning
+          <i class="bi bi-droplet"></i> Lounge Cleaning
         </a>
 
         <div class="nav-section">Coming Soon</div>
@@ -95,7 +95,7 @@
       <nav class="nav-list">
         <a href="{{ url_for('student.dashboard') }}"
            class="{% if request.endpoint == 'student.dashboard' %}active{% endif %}">
-          <i class="bi bi-speedometer2"></i> Homepage
+          <i class="bi bi-speedometer2"></i> Home
         </a>
 
         <div class="nav-section">Communication</div>
@@ -105,26 +105,26 @@
         </a>
         <a href="{{ url_for('requests.list_view') }}"
            class="{% if request.blueprint == 'requests' %}active{% endif %}">
-          <i class="bi bi-envelope-paper"></i> Requests
+          <i class="bi bi-envelope-paper"></i> Intl Dept. Requests
         </a>
         <a href="{{ url_for('resources.index') }}"
            class="{% if request.blueprint == 'resources' %}active{% endif %}">
-          <i class="bi bi-folder2-open"></i> Resources
+          <i class="bi bi-folder2-open"></i> Useful Resources
         </a>
 
         <div class="nav-section">Lounge Life</div>
         <a href="{{ url_for('borrowing.index') }}"
            class="{% if request.blueprint == 'borrowing' %}active{% endif %}">
-          <i class="bi bi-bag"></i> Borrowing
+          <i class="bi bi-bag"></i> Shared Item Borrowing
         </a>
         <a href="{{ url_for('cleaning.index') }}"
            class="{% if request.blueprint == 'cleaning' %}active{% endif %}">
-          <i class="bi bi-droplet"></i> Cleaning
+          <i class="bi bi-droplet"></i> Lounge Cleaning
         </a>
         {% if current_user.is_sub_food_member %}
           <a href="{{ url_for('student.food') }}"
              class="{% if request.endpoint == 'student.food' %}active{% endif %}">
-            <i class="bi bi-archive"></i> Lounge Locker
+            <i class="bi bi-archive"></i> Substitute Food Locker
           </a>
         {% endif %}
 

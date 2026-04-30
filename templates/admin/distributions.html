@@ -110,6 +110,7 @@
           <th>Foods Taken</th>
           <th>Locker Remaining</th>
           <th>Recorded By</th>
+          <th>Source</th>
           <th class="text-end">Action</th>
         </tr>
       </thead>
@@ -140,6 +141,13 @@
             {% endfor %}
           </td>
           <td><small>{{ d.performed_by_user_name }}</small></td>
+          <td>
+            {% if d.source_type == 'student_self_pickup' %}
+              <span class="badge bg-info text-dark">Student pickup</span>
+            {% else %}
+              <span class="badge bg-secondary">Staff recorded</span>
+            {% endif %}
+          </td>
           <td class="text-end">
             <form method="post" action="{{ url_for('admin.delete_distribution', dist_id=d.id) }}"
                   class="d-inline"
@@ -151,7 +159,7 @@
           </td>
         </tr>
         {% else %}
-        <tr><td colspan="6" class="text-center text-muted py-4">No pickups recorded in this range.</td></tr>
+        <tr><td colspan="7" class="text-center text-muted py-4">No pickups recorded in this range.</td></tr>
         {% endfor %}
       </tbody>
     </table>
