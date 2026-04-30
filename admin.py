@@ -184,9 +184,19 @@ def users():
     if role_filter in ("admin", "manager", "student"):
         q = q.filter_by(role=role_filter)
     user_list = q.order_by(User.role, User.created_at.desc()).all()
+
+    # Summary counts via SQL aggregates — no Python-side filtering needed.
+    # Using a dict (hash map) so the template can access any count in O(1).
+    counts = {
+        "total": User.query.count(),
+        "students": User.query.filter_by(role="student").count(),
+        "managers": User.query.filter_by(role="manager").count(),
+        "sub_food": User.query.filter_by(role="student",
+                                         is_sub_food_member=True).count(),
+    }
     return render_template(
         "admin/users.html",
-        users=user_list, role_filter=role_filter,
+        users=user_list, role_filter=role_filter, counts=counts,
     )
 
 

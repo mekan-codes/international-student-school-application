@@ -17,8 +17,8 @@
     <p class="text-muted mb-0">
       Cleaning sessions assigned to your team
       {% if my_teams|length > 1 %}s{% endif %}.
-      Tick subtasks as you finish — staff will verify and approve.
-      Tap a team to see who's on it.
+      Mark subtasks as you finish — staff will verify and approve.
+      Tap a team name to see who's on it.
     </p>
     <div class="d-flex flex-wrap gap-2">
       {% for t in my_teams %}
@@ -36,7 +36,7 @@
     <div class="card">
       <div class="card-body text-center py-5 text-muted">
         <i class="bi bi-calendar-check" style="font-size:2rem;"></i>
-        <div class="mt-2">No sessions scheduled for your team yet.</div>
+        <div class="mt-2">No cleaning sessions scheduled for your team yet.</div>
       </div>
     </div>
   {% else %}
@@ -56,7 +56,7 @@
                 {% endif %}
                 <span class="mx-1">·</span>
                 <a href="{{ url_for('cleaning.team_members', team_id=s.team_id) }}"
-                   class="text-decoration-none">
+                   class="text-decoration-none text-muted">
                   <i class="bi bi-people"></i> {{ s.team_name }}
                 </a>
                 {% if s.location %}
@@ -73,6 +73,12 @@
                   {% endif %}
                 </div>
               {% endif %}
+              {% if s.status == 'approved' and s.approved_by_name %}
+                <div class="text-muted small mt-1">
+                  <i class="bi bi-check-circle text-success"></i>
+                  Approved by {{ s.approved_by_name }}
+                </div>
+              {% endif %}
             </div>
             <div class="d-flex flex-wrap gap-1 align-items-start">
               <span class="badge {{ s.status_badge_class }}">{{ s.status_label }}</span>
@@ -85,7 +91,20 @@
           </div>
 
           {% if s.description %}
-            <p class="text-muted mt-2 mb-0">{{ s.description }}</p>
+            <p class="text-muted mt-2 mb-0 small">{{ s.description }}</p>
+          {% endif %}
+
+          {# ---- Session-level approved notice ---- #}
+          {% if s.status == 'approved' %}
+            <div class="alert alert-success mt-3 mb-0 py-2 small">
+              <i class="bi bi-check-circle-fill"></i>
+              This cleaning session has been approved. Great work!
+            </div>
+          {% elif s.status == 'cancelled' %}
+            <div class="alert alert-secondary mt-3 mb-0 py-2 small">
+              <i class="bi bi-x-circle"></i>
+              This cleaning session has been cancelled.
+            </div>
           {% endif %}
 
           {% if s.tasks %}
@@ -94,47 +113,57 @@
               {% for t in s.tasks %}
                 <li class="task-item task-{{ t.status }}">
                   <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-                    <div>
+                    <div class="flex-grow-1">
                       <i class="bi
                                 {% if t.status == 'verified_done' %}bi-check-circle-fill text-success
                                 {% elif t.status == 'marked_done' %}bi-clock-history text-warning
                                 {% elif t.status == 'missed' %}bi-x-circle-fill text-danger
                                 {% else %}bi-circle text-muted{% endif %}"></i>
                       <span class="fw-semibold">{{ t.task_name }}</span>
-                      <span class="badge {{ t.status_badge_class }} ms-2">
+                      <span class="badge {{ t.status_badge_class }} ms-1">
                         {{ t.status_label }}
                       </span>
-                      {% if t.marked_done_by_name %}
-                        <div class="text-muted small ms-4">
-                          Marked done by {{ t.marked_done_by_name }}
-                          {% if t.marked_done_at %}
-                            · {{ t.marked_done_at.strftime('%b %d · %H:%M') }}
-                          {% endif %}
+
+                      {# --- Per-status display for marked_done / verified_done / missed --- #}
+                      {% if t.status == 'marked_done' %}
+                        <div class="text-muted small ms-4 mt-1">
+                          <i class="bi bi-hourglass-split text-warning"></i>
+                          Waiting for staff verification
                           {% if t.student_note %}
-                            <div class="fst-italic">"{{ t.student_note }}"</div>
+                            — <span class="fst-italic">"{{ t.student_note }}"</span>
                           {% endif %}
                         </div>
-                      {% endif %}
-                      {% if t.verified_by_name %}
-                        <div class="text-muted small ms-4">
-                          Verified by {{ t.verified_by_name }}
+                      {% elif t.status == 'verified_done' %}
+                        <div class="text-muted small ms-4 mt-1">
+                          <i class="bi bi-check-circle-fill text-success"></i>
+                          Verified by {{ t.verified_by_name or 'staff' }}
                           {% if t.verified_at %}
-                            · {{ t.verified_at.strftime('%b %d · %H:%M') }}
+                            · {{ t.verified_at.strftime('%b %d') }}
+                          {% endif %}
+                          {% if t.admin_note %}
+                            — <span class="fst-italic">"{{ t.admin_note }}"</span>
+                          {% endif %}
+                        </div>
+                      {% elif t.status == 'missed' %}
+                        <div class="text-muted small ms-4 mt-1">
+                          <i class="bi bi-x-circle-fill text-danger"></i>
+                          Marked missed by staff
+                          {% if t.admin_note %}
+                            — <span class="fst-italic">"{{ t.admin_note }}"</span>
                           {% endif %}
                         </div>
                       {% endif %}
                     </div>
-                    {% if s.is_active
-                          and t.status in ('assigned', 'marked_done')
-                          and s.team_id in my_team_ids %}
+
+                    {# --- Student action: only for assigned tasks in active sessions --- #}
+                    {% if s.is_active and t.status == 'assigned' and s.team_id in my_team_ids %}
                       <form method="post"
                             action="{{ url_for('cleaning.mark_done', task_id=t.id) }}"
                             class="d-flex gap-2 align-items-center flex-wrap">
                         <input class="form-control form-control-sm" name="student_note"
-                               placeholder="Optional note" style="max-width:240px;">
+                               placeholder="Optional note" style="max-width:200px;">
                         <button class="btn btn-sm btn-outline-success" type="submit">
-                          <i class="bi bi-check2"></i>
-                          {% if t.status == 'marked_done' %}Update{% else %}Mark done{% endif %}
+                          <i class="bi bi-check2"></i> Mark done
                         </button>
                       </form>
                     {% endif %}

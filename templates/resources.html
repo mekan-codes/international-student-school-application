@@ -2,32 +2,207 @@
 {% block title %}Resources{% endblock %}
 
 {% block content %}
-<p class="text-muted">
-  Shared common drives for the international lounge community.
-  Links open in a new tab.
-</p>
 
-<div class="row g-3">
-  {% for r in resources %}
-    <div class="col-md-6">
-      <a href="{{ r.href }}" target="_blank" rel="noopener noreferrer"
-         class="text-decoration-none text-reset">
-        <div class="card h-100 resource-card">
-          <div class="card-body d-flex align-items-start gap-3">
-            <div class="resource-icon">
-              <i class="bi {{ r.icon }}"></i>
-            </div>
-            <div class="flex-grow-1">
-              <h5 class="mb-1">
-                {{ r.title }}
-                <i class="bi bi-box-arrow-up-right small text-muted ms-1"></i>
-              </h5>
-              <p class="text-muted mb-0">{{ r.description }}</p>
+{% if current_user.is_staff %}
+  {# ===== Staff view: manage resources ===== #}
+  <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+    <p class="text-muted mb-0">
+      Manage shared link cards for the lounge community.
+      Students see active resources only.
+    </p>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addResourceModal">
+      <i class="bi bi-plus-lg"></i> Add resource
+    </button>
+  </div>
+
+  {% if not resources %}
+    <div class="card">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-folder2-open" style="font-size:2.5rem; color:var(--primary);"></i>
+        <h5 class="mt-3 mb-2">No resources yet</h5>
+        <p class="text-muted mb-0">Add your first resource card using the button above.</p>
+      </div>
+    </div>
+  {% else %}
+    <div class="row g-3">
+      {% for r in resources %}
+        <div class="col-md-6">
+          <div class="card h-100 resource-card {% if not r.is_active %}opacity-50{% endif %}">
+            <div class="card-body d-flex align-items-start gap-3">
+              <div class="resource-icon">
+                <i class="bi bi-cloud-arrow-down"></i>
+              </div>
+              <div class="flex-grow-1">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                  <div>
+                    <h5 class="mb-1">
+                      {{ r.title }}
+                      {% if not r.is_active %}
+                        <span class="badge bg-secondary ms-1">Inactive</span>
+                      {% endif %}
+                    </h5>
+                    {% if r.description %}
+                      <p class="text-muted mb-2 small">{{ r.description }}</p>
+                    {% endif %}
+                    <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer"
+                       class="text-primary small text-break">
+                      <i class="bi bi-box-arrow-up-right me-1"></i>{{ r.url }}
+                    </a>
+                  </div>
+                </div>
+                <div class="mt-3 d-flex gap-2">
+                  <button class="btn btn-sm btn-outline-secondary"
+                          data-bs-toggle="modal"
+                          data-bs-target="#editResource{{ r.id }}">
+                    <i class="bi bi-pencil"></i> Edit
+                  </button>
+                  <form method="post"
+                        action="{{ url_for('resources.delete_resource', resource_id=r.id) }}"
+                        class="d-inline"
+                        onsubmit="return confirm('Delete resource {{ r.title }}?');">
+                    <button class="btn btn-sm btn-outline-danger" type="submit">
+                      <i class="bi bi-trash"></i> Delete
+                    </button>
+                  </form>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </a>
+      {% endfor %}
     </div>
+  {% endif %}
+
+  {# ===== Add resource modal ===== #}
+  <div class="modal fade" id="addResourceModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="post" action="{{ url_for('resources.add_resource') }}"
+            class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-plus-lg"></i> Add resource</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input class="form-control" name="title" required
+                   placeholder="e.g. Common Drive 1">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">URL <span class="text-danger">*</span></label>
+            <input class="form-control" name="url" type="url" required
+                   placeholder="https://example.com/drive">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description" rows="2"
+                      placeholder="Brief description for students"></textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_active"
+                   id="addActive" checked>
+            <label class="form-check-label" for="addActive">
+              Active (visible to students)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Add resource
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ===== Edit resource modals ===== #}
+  {% for r in resources %}
+  <div class="modal fade" id="editResource{{ r.id }}" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <form method="post"
+            action="{{ url_for('resources.edit_resource', resource_id=r.id) }}"
+            class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title"><i class="bi bi-pencil"></i> Edit resource</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+        </div>
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Title <span class="text-danger">*</span></label>
+            <input class="form-control" name="title" required value="{{ r.title }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">URL <span class="text-danger">*</span></label>
+            <input class="form-control" name="url" type="url" required
+                   value="{{ r.url }}">
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Description</label>
+            <textarea class="form-control" name="description"
+                      rows="2">{{ r.description or '' }}</textarea>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" name="is_active"
+                   id="editActive{{ r.id }}" {% if r.is_active %}checked{% endif %}>
+            <label class="form-check-label" for="editActive{{ r.id }}">
+              Active (visible to students)
+            </label>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg"></i> Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
   {% endfor %}
-</div>
+
+{% else %}
+  {# ===== Student view: external link cards ===== #}
+  <p class="text-muted mb-4">
+    Shared resources for the international lounge community.
+    Links open in a new tab.
+  </p>
+
+  {% if not resources %}
+    <div class="card">
+      <div class="card-body text-center py-5">
+        <i class="bi bi-folder2-open" style="font-size:2.5rem; color:var(--primary);"></i>
+        <h5 class="mt-3 mb-2">No resources available yet</h5>
+        <p class="text-muted mb-0">Check back later — staff will add shared drives and links here.</p>
+      </div>
+    </div>
+  {% else %}
+    <div class="row g-3">
+      {% for r in resources %}
+        <div class="col-md-6">
+          <a href="{{ r.url }}" target="_blank" rel="noopener noreferrer"
+             class="text-decoration-none text-reset">
+            <div class="card h-100 resource-card">
+              <div class="card-body d-flex align-items-start gap-3">
+                <div class="resource-icon">
+                  <i class="bi bi-cloud-arrow-down"></i>
+                </div>
+                <div class="flex-grow-1">
+                  <h5 class="mb-1">
+                    {{ r.title }}
+                    <i class="bi bi-box-arrow-up-right small text-muted ms-1"></i>
+                  </h5>
+                  {% if r.description %}
+                    <p class="text-muted mb-0">{{ r.description }}</p>
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+          </a>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+{% endif %}
+
 {% endblock %}

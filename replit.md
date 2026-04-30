@@ -300,6 +300,38 @@ Routes smoke-tested while logged in (admin + S001):
 - Renamed `/admin/students` → `/admin/users` with role filter.
 - Additive SQLite migration on every start.
 
+## V3.2 polish (Apr 2026)
+
+### Editable Resources
+- `Resource` DB model replaces hardcoded list in `resources.py`.
+- Staff (admin/manager) can add/edit/delete resource cards via modal UI.
+- Students see only `is_active=True` resources.
+- Two placeholder cards seeded on first-run.
+
+### Cleaning admin UI cleanup
+- Per-task action buttons replaced with a single **Manage** button/modal per task.
+- Manage modal: Verify, Mark Missed, Reset to Assigned, Delete task.
+- Session actions reorganised into a clean action row with collapse panels for Postpone/Edit.
+- New `POST /tasks/<id>/reset` route to reset a task back to `assigned`.
+
+### Student cleaning UX fix
+- `assigned` → shows "Mark done" form.
+- `marked_done` → shows "Waiting for staff verification" text only (no "Update" button).
+- `verified_done` → shows "Verified by [name]" text only.
+- `missed` → shows "Marked missed by staff" text only.
+- Approved sessions show a banner; no student action buttons.
+
+### Users page polish
+- Table simplified to: Name, Student ID, Email, Status, Actions.
+- Summary cards above table: Total / Students / Managers / Sub-food members.
+- Badges: "No" → "Standard", "Member" → "Sub-food".
+- `counts` dict passed from route (SQL aggregates, O(1) template access).
+
+### Sidebar reorganisation
+- Resources moved under **Communication** for both staff and students.
+- Staff "Manage" section renamed "Management".
+- Student "Lounge Locker" moved inside **Lounge Life** section.
+
 ## Secrets
 `SESSION_SECRET` env var is used for Flask sessions; falls back to a
 dev-only string when unset.
