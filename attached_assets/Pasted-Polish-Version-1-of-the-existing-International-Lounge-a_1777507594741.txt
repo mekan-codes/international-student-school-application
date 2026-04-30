@@ -1,0 +1,118 @@
+Polish Version 1 of the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Keep the app runnable.
+- Focus only on V1 polish, navigation, settings/profile UX, and performance cleanup.
+- Do not implement big new modules yet.
+
+Tasks:
+
+1. Improve student navigation
+Currently the sidebar has a visible “My Profile” item.
+Remove “My Profile” from the main sidebar navigation.
+
+Instead:
+- Make the bottom user block clickable.
+- The bottom user block contains the user avatar/initial, name, and student ID/email.
+- When the user clicks that bottom user block, navigate to /profile.
+- Keep Logout below or near the user block.
+- Add hover styling so users understand it is clickable.
+
+This should apply to students, managers, and admins if the same sidebar is shared.
+
+2. Add Settings page
+Add a Settings page or route.
+
+Settings should include:
+- Profile settings section
+- Password change section
+- Phone number/privacy section
+
+If the current Profile page already has these forms, either:
+- rename Profile to Settings, or
+- make Settings contain the same controls and redirect /profile to /settings.
+
+Use the better option based on the current code structure.
+
+Navigation behavior:
+- Students should access Settings by clicking the bottom user block.
+- Admins/managers may also have a Settings option if appropriate.
+- Avoid cluttering the sidebar.
+
+3. Student-facing cleanup
+Students should not see internal system labels such as:
+- role
+- program subscription
+- substitute food membership
+- limited access
+
+Normal students:
+- should see only a simple general dashboard
+- should not see food-related pages or food-related messages
+
+Sub-food students:
+- can see available food naturally
+- should not see internal membership wording
+
+4. Sidebar and dashboard polish
+Improve visual consistency:
+- cleaner spacing
+- consistent active states
+- readable icons/text
+- avoid crowded sidebar items
+- keep future modules as “Coming soon”
+- do not make the sidebar too busy
+
+5. Food UI polish
+Improve Food Items and food availability UI:
+- show calories per serving clearly if present
+- show “Calories not listed” if missing
+- show warehouse/locker quantities cleanly
+- keep Warehouse and Locker shortcuts clickable if already implemented
+- improve spacing and badges
+- do not crowd action buttons
+
+6. Users page polish
+Make sure Users page has only one main action per row:
+- Manage
+
+Inside Manage modal/panel include:
+- edit profile info
+- role change if allowed
+- substitute food access toggle if allowed
+- reset password if allowed
+- delete if allowed
+
+Keep delete separated and confirmed.
+
+7. Performance/data structure cleanup
+Review the code for unnecessary repeated calculations and inefficient rendering.
+
+Improve where reasonable:
+- avoid recalculating dashboard summaries repeatedly on every render
+- use efficient lookups such as maps/dictionaries for users/food/items where helpful
+- avoid repeated filtering inside large render loops
+- use memoization/cached derived data if using React
+- keep database queries simple and indexed if applicable
+- do not over-engineer
+
+Add short comments where data structures are intentionally used, because this is a data structures class project.
+
+8. Documentation update
+Update README.md and docs/project-spec.md with:
+- V1 polish changes
+- Settings/profile behavior
+- student navigation behavior
+- performance/data structure notes
+- future modules still planned but not implemented
+
+After finishing, summarize:
+1. files changed
+2. UI/UX changes
+3. performance/data structure changes
+4. how to test admin flow
+5. how to test manager flow
+6. how to test sub-food student flow
+7. how to test normal student flow

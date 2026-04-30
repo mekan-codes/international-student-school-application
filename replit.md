@@ -20,7 +20,7 @@ models.py         User (with phone/privacy/protection flags), FoodItem, ...
 auth.py           login (by email or student_id) / register / logout
 admin.py          admin & manager blueprint (mounted at /admin)
 student.py        student blueprint (general dashboard + food page)
-profile.py        profile + dedicated password change form
+profile.py        /settings (profile + password); /profile → /settings
 seed.py           demo data
 templates/        Jinja templates
 static/css/       stylesheet
@@ -57,6 +57,12 @@ You can sign in with the email or the student ID.
   permission gating; use `is_admin` for admin-only paths.
 
 ## Recent changes
+- **V1 polish pass**: removed standalone "My Profile" sidebar item;
+  the bottom user chip is now a clickable link to `/settings` with
+  hover/active styling. Profile page renamed to **Settings**;
+  `/profile` is a 301 redirect to `/settings`. Dashboard low-stock
+  filter pushed into SQL. Distribution flow uses dict (hash map) by
+  food id for O(1) lookups, with comments explaining the choice.
 - Users page redesigned: **single Manage button per row** opens a
   consolidated modal (profile edit, role change, membership toggle,
   password reset, separated *Danger zone* delete).

@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block title %}My Profile{% endblock %}
+{% block title %}Settings{% endblock %}
 
 {% block content %}
 <div class="row g-3">
   <div class="col-lg-7">
     <div class="card mb-3">
-      <div class="card-header"><strong>Edit your profile</strong></div>
+      <div class="card-header">
+        <strong><i class="bi bi-person-gear"></i> Profile information</strong>
+      </div>
       <div class="card-body">
-        <form method="post" action="{{ url_for('profile.index') }}">
+        <form method="post" action="{{ url_for('profile.settings') }}">
           <div class="mb-3">
             <label class="form-label">Full name</label>
             <input class="form-control" name="name" value="{{ current_user.name }}" required>
@@ -46,7 +48,7 @@
     {# ---- Separate, dedicated password change form (safer flow) ---- #}
     <div class="card">
       <div class="card-header">
-        <strong><i class="bi bi-shield-lock"></i> Change password</strong>
+        <strong><i class="bi bi-shield-lock"></i> Password</strong>
       </div>
       <div class="card-body">
         <form method="post" action="{{ url_for('profile.change_password') }}">

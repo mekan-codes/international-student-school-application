@@ -81,7 +81,7 @@ Resolution rule:
 Failed lookups return a generic "Invalid email/student ID or password"
 message — no user enumeration.
 
-### Self-service password change (profile page)
+### Self-service password change (settings page)
 
 Three required fields:
 - `current_password`
@@ -139,19 +139,38 @@ Unchanged — see commit history for full schemas.
 
 ## 6. Sidebar navigation by role
 
-| Sidebar group  | Admin | Manager | Sub-food Student | Std. Student |
-|----------------|:-----:|:-------:|:----------------:|:------------:|
-| Dashboard      |   ✅   |    ✅   |        ✅         |       ✅      |
-| Users          |   ✅   |    ✅   |        —         |       —      |
-| Food Items     |   ✅   |    ✅   |        —         |       —      |
-| Warehouse      |   ✅   |    ✅   |        —         |       —      |
-| Locker         |   ✅   |    ✅   |        —         |       —      |
-| Transfer Stock |   ✅   |    ✅   |        —         |       —      |
-| Shareable Log  |   ✅   |    ✅   |        —         |       —      |
-| Inventory Log  |   ✅   |    ✅   |        —         |       —      |
-| Lounge Locker  |   —   |    —   |        ✅         |       —      |
-| My Profile     |   ✅   |    ✅   |        ✅         |       ✅      |
-| Coming-soon × 5|   ✅   |    ✅   |        ✅         |       ✅      |
+The sidebar is intentionally short. The user's account/settings entry
+point is **not** a separate nav item — it is the clickable **user chip**
+at the bottom of the sidebar (see §6.1).
+
+| Sidebar group     | Admin | Manager | Sub-food Student | Std. Student |
+|-------------------|:-----:|:-------:|:----------------:|:------------:|
+| Dashboard         |   ✅   |    ✅   |        ✅         |       ✅      |
+| Users             |   ✅   |    ✅   |        —         |       —      |
+| Food Items        |   ✅   |    ✅   |        —         |       —      |
+| Warehouse         |   ✅   |    ✅   |        —         |       —      |
+| Locker            |   ✅   |    ✅   |        —         |       —      |
+| Transfer Stock    |   ✅   |    ✅   |        —         |       —      |
+| Shareable Log     |   ✅   |    ✅   |        —         |       —      |
+| Inventory Log     |   ✅   |    ✅   |        —         |       —      |
+| Lounge Locker     |   —   |    —   |        ✅         |       —      |
+| Coming-soon × 5   |   ✅   |    ✅   |        ✅         |       ✅      |
+| **User chip → Settings** (footer) | ✅ | ✅ | ✅ | ✅ |
+| Logout (footer)   |   ✅   |    ✅   |        ✅         |       ✅      |
+
+### 6.1 Sidebar footer (clickable user chip)
+
+The user chip shows the avatar (first initial), the user's name, and
+either their student ID (students) or email (staff). The whole chip is a
+single `<a>` element pointing to `/settings`:
+
+- Hover state: subtle background + border so users see it's clickable.
+- Active state: highlighted while the user is on `/settings`.
+- A small gear icon on the right reinforces the affordance.
+- Logout sits directly beneath it in the same footer area.
+
+This pattern intentionally replaces the previous separate "My Profile"
+sidebar item — keeping the navigation list focused on real modules.
 
 ## 7. Food Items page UX
 
@@ -210,8 +229,46 @@ classification labels:
 - Sub-food members see a *Lounge Locker* page (renamed from "Food
   Availability") with name, category, available quantity, calories per
   serving, and serving size when set.
-- The student profile lists only name, student ID, email, phone number,
-  and the edit/password forms — no role row, no membership row.
+- The student Settings page lists only name, student ID, email, phone
+  number, and the edit/password forms — no role row, no membership row.
+
+## 9.1 Settings page (`/settings`)
+
+The Settings page is the single place where any user updates their own
+account. It contains three sections:
+
+1. **Profile information** — full name, email.
+2. **Phone number / privacy** — optional phone number with a
+   `show_phone_number` toggle.
+3. **Password** — current + new + confirm password change.
+
+For staff, an "Account details" side card additionally shows the role
+badge and joined date for operational context. Students never see role
+badges on this page.
+
+The legacy `/profile` URL is preserved as a permanent (`301`) redirect
+to `/settings`, so any existing links or bookmarks keep working.
+
+## 9.2 Performance / data structure notes
+
+This is a data structures class project. The few non-trivial routes
+carry short comments naming the data structure they use and why:
+
+- **Admin dashboard.** Counts and totals use SQL `COUNT()`/`SUM()`
+  aggregates. The low-stock list pushes the comparison into the
+  database (`locker_quantity <= low_stock_threshold`) instead of
+  loading the whole food table and filtering in Python — analogous to
+  preferring an indexed lookup over a linear scan.
+- **Shareable Food Log — recording a pickup.** Form lines are folded
+  into a `dict` (hash map) keyed by `food_id` so duplicate selections
+  are summed in O(1) per entry. A second `dict` of `FoodItem` by id
+  gives O(1) lookups while validating each line and applying the stock
+  change.
+- **Shareable Food Log — deleting a pickup.** Reversing a distribution
+  uses the same id→FoodItem `dict` for O(1) restock lookups across all
+  lines.
+- **No work in render loops.** Templates iterate already-prepared lists
+  and never re-query the database inside `{% for %}` blocks.
 
 ## 10. Future expansion
 
