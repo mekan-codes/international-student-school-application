@@ -317,14 +317,13 @@ carry short comments naming the data structure they use and why:
 
 ## 10. Future expansion
 
-Sidebar placeholders for the following modules; they all currently render
-a "Coming soon" page.
+The remaining sidebar placeholder is a single "Coming soon" page:
 
-| Module                        | New routes               |
-|-------------------------------|--------------------------|
-| Borrowing system              | `/borrowing/...`         |
-| Common Group Chat             | `/chat/...`              |
-| Cleaning Sessions             | `/cleaning/...`          |
+| Module                        | New routes               | Status |
+|-------------------------------|--------------------------|--------|
+| Common Group Chat             | `/chat/...`              | Coming soon |
+| Borrowing system              | `/borrowing/...`         | **Implemented in V3** |
+| Cleaning sessions             | `/cleaning/...`          | **Implemented in V3** |
 
 Each module follows the same blueprint pattern as the food module.
 
@@ -427,3 +426,124 @@ The requests blueprint is registered under the name `"requests"` so
 `url_for("requests.list_view")` works from anywhere. The implementation
 file is named **`requests_bp.py`** to avoid shadowing the popular
 `requests` PyPI library if it is ever installed for HTTP work.
+
+---
+
+## 12. Version 3 features (implemented)
+
+V3 ships two new modules on top of V2: **Borrowing** and **Cleaning
+teams + sessions**.
+
+### 12.1 Permission matrix
+
+| Feature                                              | Admin | Manager | Sub-food Student | Std. Student |
+|------------------------------------------------------|:-----:|:-------:|:----------------:|:------------:|
+| View borrowable item catalog                         |   ✅   |    ✅   |        ✅         |       ✅      |
+| Create / edit / activate borrowable items            |   ✅   |    ✅   |        —         |       —      |
+| Submit borrow request                                |   —   |    —   |        ✅         |       ✅      |
+| Approve / reject / mark returned                     |   ✅   |    ✅   |        —         |       —      |
+| View own borrow requests                             |   —   |    —   |        ✅         |       ✅      |
+| Create / edit cleaning teams                         |   ✅   |    ✅   |        —         |       —      |
+| Create / edit / cancel sessions                      |   ✅   |    ✅   |        —         |       —      |
+| Add / delete subtasks on a session                   |   ✅   |    ✅   |        —         |       —      |
+| Tick own team's subtask as done (with note)          |   —   |    —   |        ✅¹        |       ✅¹     |
+| Verify subtask / mark missed                         |   ✅   |    ✅   |        —         |       —      |
+
+¹ Only for sessions whose team they belong to.
+
+### 12.2 Data model (additions)
+
+Six new tables, all auto-created via `db.create_all()` on first start —
+no schema migration is needed.
+
+- **`borrowable_items`** — `id`, `name` (unique), `category`,
+  `description`, `total_quantity`, `available_quantity`, `is_active`,
+  `created_at`. Stock invariant `0 ≤ available ≤ total` enforced
+  in the route handlers.
+- **`borrow_requests`** — `id`, `student_id` → `users.id`,
+  `student_name` (snapshot), `item_id` → `borrowable_items.id`,
+  `item_name` (snapshot), `quantity`, `borrow_until_date`,
+  `status` (`pending`/`approved`/`rejected`/`returned`),
+  `student_note`, `staff_note`, `handled_by_id` → `users.id`,
+  `handled_by_name` (snapshot), `handled_at`, `created_at`,
+  `updated_at`.
+- **`cleaning_teams`** — `id`, `name` (unique), `description`,
+  `is_active`, `created_at`.
+- **`cleaning_team_members`** — composite-PK join table
+  (`team_id`, `student_id`).
+- **`cleaning_sessions`** — `id`, `team_id` → `cleaning_teams.id`,
+  `team_name` (snapshot), `title`, `scheduled_date`, `start_time`,
+  `end_time`, `location`, `status` (`scheduled`/`in_progress`/
+  `completed`/`cancelled`), `notes`, `created_at`, `updated_at`.
+- **`cleaning_tasks`** — `id`, `session_id` → `cleaning_sessions.id`,
+  `description`, `assigned_student_id` → `users.id` (nullable),
+  `student_name` (snapshot), `status` (`assigned`/`marked_done`/
+  `verified_done`/`marked_missed`), `student_note`,
+  `marked_done_at`, `verified_by_id` → `users.id`,
+  `handled_by_name` (snapshot), `verified_at`, `created_at`,
+  `updated_at`.
+
+### 12.3 Routes
+
+**Borrowing** (blueprint `borrowing`, mount `/borrowing`):
+
+| Method | Path                              | Who      | Purpose                          |
+|-------:|-----------------------------------|----------|----------------------------------|
+| GET    | `/`                               | All      | Staff catalog/queue OR student feed |
+| POST   | `/items/add`                      | Staff    | Create borrowable item           |
+| POST   | `/items/<id>/edit`                | Staff    | Edit item                        |
+| POST   | `/items/<id>/delete`              | Staff    | Delete (only if no requests)     |
+| POST   | `/request`                        | Student  | Submit a borrow request          |
+| POST   | `/requests/<id>/approve`          | Staff    | Approve (decrement available)    |
+| POST   | `/requests/<id>/reject`           | Staff    | Reject (no stock change)         |
+| POST   | `/requests/<id>/return`           | Staff    | Mark returned (restore stock)    |
+
+**Cleaning** (blueprint `cleaning`, mount `/cleaning`):
+
+| Method | Path                                  | Who    | Purpose                               |
+|-------:|---------------------------------------|--------|---------------------------------------|
+| GET    | `/`                                   | All    | Staff admin OR student team-feed      |
+| POST   | `/teams/add`                          | Staff  | Create team + initial members         |
+| POST   | `/teams/<id>/edit`                    | Staff  | Rename / sync members (set diff)      |
+| POST   | `/teams/<id>/delete`                  | Staff  | Delete (cascades to sessions/tasks)   |
+| POST   | `/sessions/add`                       | Staff  | Schedule session + parse subtasks     |
+| POST   | `/sessions/<id>/edit`                 | Staff  | Edit session metadata                 |
+| POST   | `/sessions/<id>/cancel`               | Staff  | Cancel a session                      |
+| POST   | `/sessions/<id>/tasks/add`            | Staff  | Add a subtask                         |
+| POST   | `/tasks/<id>/delete`                  | Staff  | Remove a subtask                      |
+| POST   | `/tasks/<id>/mark-done`               | Member | Tick own team's subtask + note        |
+| POST   | `/tasks/<id>/verify`                  | Staff  | Verify a subtask                      |
+| POST   | `/tasks/<id>/missed`                  | Staff  | Mark a subtask as missed              |
+
+### 12.4 Auto-completion rule
+
+After every staff verification on a `cleaning_task`, the parent session
+is checked: if **all** its tasks are `verified_done`, the session's
+`status` flips to `completed` automatically — no manual "complete
+session" button is needed.
+
+### 12.5 Snapshot history
+
+To keep history readable when names change or accounts are deleted,
+both modules write the relevant display name into the row at action
+time:
+
+- `borrow_requests` stores `student_name`, `item_name`,
+  `handled_by_name`.
+- `cleaning_sessions` stores `team_name`.
+- `cleaning_tasks` stores `student_name`, `handled_by_name`.
+
+These are presentational only — the foreign keys remain authoritative.
+
+### 12.6 Data structures used
+
+- **Hash-set diff for team membership.** Editing a team computes
+  `current_set` and `desired_set` of student IDs and applies the
+  symmetric difference to `cleaning_team_members`, so a single edit
+  costs O(|added| + |removed|) instead of O(|all|²).
+- **Set membership for student access.** The student cleaning view
+  uses an `in` test against the team's member set to decide whether
+  to render *Mark done* — O(1) per lookup.
+- **SQL aggregates for queue counters.** Pending borrow request and
+  open cleaning task counts are computed with `COUNT(*)` queries
+  rather than loading rows into Python.

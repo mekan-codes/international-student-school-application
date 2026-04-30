@@ -14,6 +14,8 @@ from student import student_bp
 from profile import profile_bp
 from announcements import announcements_bp
 from requests_bp import requests_bp
+from borrowing import borrowing_bp
+from cleaning import cleaning_bp
 from seed import seed_database
 
 
@@ -95,6 +97,8 @@ def create_app():
     app.register_blueprint(profile_bp)
     app.register_blueprint(announcements_bp, url_prefix="/announcements")
     app.register_blueprint(requests_bp, url_prefix="/requests")
+    app.register_blueprint(borrowing_bp, url_prefix="/borrowing")
+    app.register_blueprint(cleaning_bp, url_prefix="/cleaning")
 
     # ----- Root route: redirect based on role -----
     @app.route("/")

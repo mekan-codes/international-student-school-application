@@ -326,3 +326,234 @@ class SupportRequest(db.Model):
     @property
     def has_response(self) -> bool:
         return bool(self.admin_response and self.admin_response.strip())
+
+
+# =========================================================================== #
+# Version 3: Borrowing system                                                 #
+# =========================================================================== #
+class BorrowableItem(db.Model):
+    """A shared physical item (umbrella, charger, etc.) that students can
+    request to borrow. Quantity tracking is kept on the row for simplicity:
+    `available_quantity` is the live count of items not currently lent out.
+    """
+    __tablename__ = "borrowable_items"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    category = db.Column(db.String(80), nullable=False, default="general")
+    description = db.Column(db.Text, nullable=True)
+
+    total_quantity = db.Column(db.Integer, nullable=False, default=0)
+    available_quantity = db.Column(db.Integer, nullable=False, default=0)
+
+    is_active = db.Column(db.Boolean, nullable=False, default=True)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+
+class BorrowRequest(db.Model):
+    """A student request to borrow N copies of an item until a chosen date.
+    Status flows through: pending → approved → returned (or rejected).
+    Quantity stock changes are enforced inside the borrowing blueprint so
+    `available_quantity` never goes negative or exceeds `total_quantity`.
+    """
+    __tablename__ = "borrow_requests"
+
+    STATUSES = ("pending", "approved", "rejected", "returned")
+
+    id = db.Column(db.Integer, primary_key=True)
+    item_id = db.Column(db.Integer, db.ForeignKey("borrowable_items.id"),
+                        nullable=False)
+    # Snapshot of the item name at request time (so renames don't rewrite history).
+    item_name = db.Column(db.String(120), nullable=False)
+
+    student_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                nullable=False)
+    student_name = db.Column(db.String(120), nullable=False)
+
+    quantity = db.Column(db.Integer, nullable=False, default=1)
+    borrow_until_date = db.Column(db.Date, nullable=False)
+
+    status = db.Column(db.String(20), nullable=False, default="pending")
+
+    requested_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    approved_at = db.Column(db.DateTime, nullable=True)
+    rejected_at = db.Column(db.DateTime, nullable=True)
+    returned_at = db.Column(db.DateTime, nullable=True)
+
+    handled_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                   nullable=True)
+    handled_by_name = db.Column(db.String(120), nullable=True)
+    staff_note = db.Column(db.Text, nullable=True)
+
+    item = db.relationship("BorrowableItem", lazy="joined")
+
+    @property
+    def status_label(self) -> str:
+        return {"pending": "Pending", "approved": "Approved",
+                "rejected": "Rejected",
+                "returned": "Returned"}.get(self.status, self.status.title())
+
+    @property
+    def status_badge_class(self) -> str:
+        return {
+            "pending": "bg-secondary",
+            "approved": "bg-success",
+            "rejected": "bg-danger",
+            "returned": "bg-info text-dark",
+        }.get(self.status, "bg-secondary")
+
+
+# =========================================================================== #
+# Version 3: Cleaning teams & sessions                                        #
+# =========================================================================== #
+class CleaningTeam(db.Model):
+    """A named group of student users that can be assigned to a cleaning
+    session. A student may belong to multiple teams."""
+    __tablename__ = "cleaning_teams"
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(120), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                   nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    members = db.relationship(
+        "CleaningTeamMember", backref="team",
+        cascade="all, delete-orphan", order_by="CleaningTeamMember.student_name",
+    )
+    sessions = db.relationship(
+        "CleaningSession", backref="team",
+        order_by="CleaningSession.scheduled_date.desc()",
+    )
+
+
+class CleaningTeamMember(db.Model):
+    """Membership row joining a student user to a CleaningTeam.
+    UniqueConstraint enforces one row per (team, student) — O(1) lookup
+    on whether a student is in a given team via that index."""
+    __tablename__ = "cleaning_team_members"
+
+    id = db.Column(db.Integer, primary_key=True)
+    team_id = db.Column(db.Integer, db.ForeignKey("cleaning_teams.id"),
+                        nullable=False)
+    student_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                nullable=False)
+    # Snapshot so removed/renamed users don't break old views.
+    student_name = db.Column(db.String(120), nullable=False)
+    added_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        db.UniqueConstraint("team_id", "student_user_id",
+                            name="uq_team_member"),
+    )
+
+
+class CleaningSession(db.Model):
+    """A scheduled cleaning event for one team, broken down into subtasks.
+    Becomes 'completed' automatically when all subtasks are verified_done."""
+    __tablename__ = "cleaning_sessions"
+
+    STATUSES = ("scheduled", "completed", "cancelled")
+
+    id = db.Column(db.Integer, primary_key=True)
+    title = db.Column(db.String(160), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    location = db.Column(db.String(160), nullable=True)
+
+    team_id = db.Column(db.Integer, db.ForeignKey("cleaning_teams.id"),
+                        nullable=False)
+    # Snapshot of the team name at session-creation time.
+    team_name = db.Column(db.String(120), nullable=False)
+
+    scheduled_date = db.Column(db.Date, nullable=False)
+    start_time = db.Column(db.String(10), nullable=True)  # "HH:MM"
+    end_time = db.Column(db.String(10), nullable=True)
+
+    status = db.Column(db.String(20), nullable=False, default="scheduled")
+
+    created_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                   nullable=False)
+    created_at = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    updated_at = db.Column(
+        db.DateTime, nullable=False,
+        default=datetime.utcnow, onupdate=datetime.utcnow,
+    )
+
+    tasks = db.relationship(
+        "CleaningTask", backref="session",
+        cascade="all, delete-orphan", order_by="CleaningTask.id",
+    )
+
+    @property
+    def status_label(self) -> str:
+        return {"scheduled": "Scheduled", "completed": "Completed",
+                "cancelled": "Cancelled"}.get(self.status, self.status.title())
+
+    @property
+    def status_badge_class(self) -> str:
+        return {
+            "scheduled": "bg-secondary",
+            "completed": "bg-success",
+            "cancelled": "bg-danger",
+        }.get(self.status, "bg-secondary")
+
+    @property
+    def task_progress(self) -> tuple[int, int]:
+        """(verified_count, total_count) — used for progress display."""
+        total = len(self.tasks)
+        verified = sum(1 for t in self.tasks if t.status == "verified_done")
+        return verified, total
+
+
+class CleaningTask(db.Model):
+    """A single subtask within a CleaningSession.
+    Flow: assigned → marked_done (by student) → verified_done (by staff).
+    Staff may also mark a task 'missed'."""
+    __tablename__ = "cleaning_tasks"
+
+    STATUSES = ("assigned", "marked_done", "verified_done", "missed")
+
+    id = db.Column(db.Integer, primary_key=True)
+    session_id = db.Column(db.Integer, db.ForeignKey("cleaning_sessions.id"),
+                           nullable=False)
+    task_name = db.Column(db.String(160), nullable=False)
+    status = db.Column(db.String(20), nullable=False, default="assigned")
+
+    student_note = db.Column(db.Text, nullable=True)
+    marked_done_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                       nullable=True)
+    marked_done_by_name = db.Column(db.String(120), nullable=True)
+    marked_done_at = db.Column(db.DateTime, nullable=True)
+
+    verified_by_user_id = db.Column(db.Integer, db.ForeignKey("users.id"),
+                                    nullable=True)
+    verified_by_name = db.Column(db.String(120), nullable=True)
+    verified_at = db.Column(db.DateTime, nullable=True)
+    admin_note = db.Column(db.Text, nullable=True)
+
+    @property
+    def status_label(self) -> str:
+        return {
+            "assigned": "Assigned",
+            "marked_done": "Marked done",
+            "verified_done": "Verified",
+            "missed": "Missed",
+        }.get(self.status, self.status.title())
+
+    @property
+    def status_badge_class(self) -> str:
+        return {
+            "assigned": "bg-secondary",
+            "marked_done": "bg-warning text-dark",
+            "verified_done": "bg-success",
+            "missed": "bg-danger",
+        }.get(self.status, "bg-secondary")

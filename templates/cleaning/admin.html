@@ -1,0 +1,401 @@
+{% extends "base.html" %}
+{% block title %}Manage Cleaning{% endblock %}
+
+{% block content %}
+<p class="text-muted">
+  Build cleaning teams and schedule sessions with subtasks. A session
+  auto-completes when every subtask is verified.
+</p>
+
+<ul class="nav nav-tabs mb-3" role="tablist">
+  <li class="nav-item">
+    <a class="nav-link active" data-bs-toggle="tab" href="#sessions-pane">
+      <i class="bi bi-calendar-check"></i> Sessions
+    </a>
+  </li>
+  <li class="nav-item">
+    <a class="nav-link" data-bs-toggle="tab" href="#teams-pane">
+      <i class="bi bi-people"></i> Teams
+    </a>
+  </li>
+</ul>
+
+<div class="tab-content">
+
+  {# ============================ SESSIONS TAB ============================ #}
+  <div class="tab-pane fade show active" id="sessions-pane">
+
+    {# ---- New session form ---- #}
+    <div class="card mb-4">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <strong><i class="bi bi-plus-lg"></i> New session</strong>
+      </div>
+      <div class="card-body">
+        {% if not teams %}
+          <p class="text-muted mb-0">
+            Create a cleaning team first (Teams tab) before scheduling a session.
+          </p>
+        {% else %}
+        <form method="post" action="{{ url_for('cleaning.add_session') }}">
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label">Title</label>
+              <input class="form-control" name="title" required
+                     placeholder="e.g. Friday lounge tidy">
+            </div>
+            <div class="col-md-3">
+              <label class="form-label">Team</label>
+              <select class="form-select" name="team_id" required>
+                <option value="" disabled selected>Choose a team…</option>
+                {% for t in teams %}
+                  <option value="{{ t.id }}">{{ t.name }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-2">
+              <label class="form-label">Date</label>
+              <input class="form-control" type="date" name="scheduled_date" required>
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">Start</label>
+              <input class="form-control" type="time" name="start_time">
+            </div>
+            <div class="col-md-1">
+              <label class="form-label">End</label>
+              <input class="form-control" type="time" name="end_time">
+            </div>
+          </div>
+
+          <div class="row g-2 mt-1">
+            <div class="col-md-6">
+              <label class="form-label">Location</label>
+              <input class="form-control" name="location"
+                     placeholder="e.g. Main lounge">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Description (optional)</label>
+              <input class="form-control" name="description">
+            </div>
+          </div>
+
+          <div class="mt-2">
+            <label class="form-label">Subtasks <span class="text-muted small">(one per line)</span></label>
+            <textarea class="form-control" name="tasks" rows="4" required
+                      placeholder="Vacuuming&#10;Cleaning tables&#10;Taking out trash&#10;Organizing food locker"></textarea>
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">
+            <i class="bi bi-check-lg"></i> Create session
+          </button>
+        </form>
+        {% endif %}
+      </div>
+    </div>
+
+    {# ---- Status filter ---- #}
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+      <h5 class="mb-0">Sessions</h5>
+      <form method="get" class="d-flex gap-2">
+        <select class="form-select form-select-sm" name="status"
+                onchange="this.form.submit()">
+          <option value="">All statuses</option>
+          {% for s in statuses %}
+            <option value="{{ s }}" {% if status_f == s %}selected{% endif %}>
+              {{ s.title() }}
+            </option>
+          {% endfor %}
+        </select>
+        {% if status_f %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ url_for('cleaning.index') }}">
+            <i class="bi bi-x-lg"></i>
+          </a>
+        {% endif %}
+      </form>
+    </div>
+
+    {% if not sessions %}
+      <div class="card">
+        <div class="card-body text-center py-4 text-muted">
+          No cleaning sessions yet.
+        </div>
+      </div>
+    {% else %}
+      {% for s in sessions %}
+        {% set verified, total = s.task_progress %}
+        <article class="card mb-3 cleaning-session-card
+                {% if s.status == 'cancelled' %}cleaning-cancelled{% endif %}">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-3 flex-wrap">
+              <div>
+                <h5 class="mb-1">{{ s.title }}</h5>
+                <div class="text-muted small">
+                  <i class="bi bi-calendar"></i>
+                  {{ s.scheduled_date.strftime('%b %d, %Y') }}
+                  {% if s.start_time %}
+                    · {{ s.start_time }}{% if s.end_time %}–{{ s.end_time }}{% endif %}
+                  {% endif %}
+                  <span class="mx-1">·</span>
+                  <i class="bi bi-people"></i> {{ s.team_name }}
+                  {% if s.location %}
+                    <span class="mx-1">·</span>
+                    <i class="bi bi-geo-alt"></i> {{ s.location }}
+                  {% endif %}
+                </div>
+              </div>
+              <div class="d-flex flex-wrap gap-1 align-items-start">
+                <span class="badge {{ s.status_badge_class }}">{{ s.status_label }}</span>
+                {% if total %}
+                  <span class="badge bg-light text-dark border">
+                    {{ verified }}/{{ total }} verified
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+
+            {% if s.description %}
+              <p class="text-muted mt-2 mb-0">{{ s.description }}</p>
+            {% endif %}
+
+            <hr class="my-3">
+            <ul class="task-list">
+              {% for t in s.tasks %}
+                <li class="task-item task-{{ t.status }}">
+                  <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                    <div>
+                      <i class="bi
+                                {% if t.status == 'verified_done' %}bi-check-circle-fill text-success
+                                {% elif t.status == 'marked_done' %}bi-clock-history text-warning
+                                {% elif t.status == 'missed' %}bi-x-circle-fill text-danger
+                                {% else %}bi-circle text-muted{% endif %}"></i>
+                      <span class="fw-semibold">{{ t.task_name }}</span>
+                      <span class="badge {{ t.status_badge_class }} ms-2">
+                        {{ t.status_label }}
+                      </span>
+                      {% if t.marked_done_by_name %}
+                        <div class="text-muted small ms-4">
+                          Marked done by {{ t.marked_done_by_name }}
+                          {% if t.marked_done_at %}
+                            · {{ t.marked_done_at.strftime('%b %d · %H:%M') }}
+                          {% endif %}
+                          {% if t.student_note %}
+                            <div class="fst-italic">"{{ t.student_note }}"</div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                      {% if t.verified_by_name %}
+                        <div class="text-muted small ms-4">
+                          Verified by {{ t.verified_by_name }}
+                          {% if t.verified_at %}
+                            · {{ t.verified_at.strftime('%b %d · %H:%M') }}
+                          {% endif %}
+                          {% if t.admin_note %}
+                            <div class="fst-italic">"{{ t.admin_note }}"</div>
+                          {% endif %}
+                        </div>
+                      {% endif %}
+                    </div>
+                    <div class="d-flex flex-wrap gap-1">
+                      {% if t.status in ('marked_done', 'assigned') %}
+                        <form method="post"
+                              action="{{ url_for('cleaning.verify_task', task_id=t.id) }}"
+                              class="d-inline">
+                          <button class="btn btn-sm btn-success" type="submit">
+                            <i class="bi bi-check-circle"></i> Verify
+                          </button>
+                        </form>
+                      {% endif %}
+                      {% if t.status != 'missed' and t.status != 'verified_done' %}
+                        <form method="post"
+                              action="{{ url_for('cleaning.mark_missed', task_id=t.id) }}"
+                              class="d-inline">
+                          <button class="btn btn-sm btn-outline-danger" type="submit">
+                            <i class="bi bi-x"></i> Missed
+                          </button>
+                        </form>
+                      {% endif %}
+                      <form method="post"
+                            action="{{ url_for('cleaning.delete_task', task_id=t.id) }}"
+                            class="d-inline"
+                            onsubmit="return confirm('Delete this subtask?');">
+                        <button class="btn btn-sm btn-outline-secondary" type="submit"
+                                title="Delete subtask">
+                          <i class="bi bi-trash"></i>
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+
+            {# Add subtask + cancel/delete row #}
+            <div class="d-flex flex-wrap gap-2 align-items-end mt-3">
+              <form method="post"
+                    action="{{ url_for('cleaning.add_task', sess_id=s.id) }}"
+                    class="d-flex gap-2 align-items-end flex-grow-1">
+                <div class="flex-grow-1">
+                  <label class="form-label small mb-1">Add subtask</label>
+                  <input class="form-control form-control-sm" name="task_name"
+                         placeholder="e.g. Wipe sink" required>
+                </div>
+                <button class="btn btn-sm btn-outline-primary" type="submit">
+                  <i class="bi bi-plus-lg"></i> Add
+                </button>
+              </form>
+
+              {% if s.status == 'scheduled' %}
+                <form method="post"
+                      action="{{ url_for('cleaning.cancel_session', sess_id=s.id) }}"
+                      class="d-inline">
+                  <button class="btn btn-sm btn-outline-warning" type="submit">
+                    <i class="bi bi-x-circle"></i> Cancel session
+                  </button>
+                </form>
+              {% endif %}
+              <form method="post"
+                    action="{{ url_for('cleaning.delete_session', sess_id=s.id) }}"
+                    class="d-inline"
+                    onsubmit="return confirm('Delete this session and all its subtasks?');">
+                <button class="btn btn-sm btn-outline-danger" type="submit">
+                  <i class="bi bi-trash"></i> Delete
+                </button>
+              </form>
+            </div>
+          </div>
+        </article>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+  {# ============================ TEAMS TAB ============================ #}
+  <div class="tab-pane fade" id="teams-pane">
+
+    <div class="card mb-4">
+      <div class="card-header">
+        <strong><i class="bi bi-plus-lg"></i> Create team</strong>
+      </div>
+      <div class="card-body">
+        <form method="post" action="{{ url_for('cleaning.add_team') }}">
+          <div class="row g-2">
+            <div class="col-md-5">
+              <label class="form-label">Name</label>
+              <input class="form-control" name="name" required
+                     placeholder="e.g. Tuesday Team">
+            </div>
+            <div class="col-md-7">
+              <label class="form-label">Description (optional)</label>
+              <input class="form-control" name="description">
+            </div>
+          </div>
+          <div class="mt-3">
+            <label class="form-label">Members</label>
+            {% if not students %}
+              <div class="text-muted small">No student accounts available yet.</div>
+            {% else %}
+              <div class="row g-2 student-picker">
+                {% for u in students %}
+                  <div class="col-md-4 col-sm-6">
+                    <label class="member-pill">
+                      <input type="checkbox" name="student_ids" value="{{ u.id }}">
+                      <span>{{ u.name }}{% if u.student_id %} ({{ u.student_id }}){% endif %}</span>
+                    </label>
+                  </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+          </div>
+          <button class="btn btn-primary mt-3" type="submit">
+            <i class="bi bi-check-lg"></i> Create team
+          </button>
+        </form>
+      </div>
+    </div>
+
+    {% if not teams %}
+      <div class="card">
+        <div class="card-body text-center py-4 text-muted">
+          No cleaning teams yet.
+        </div>
+      </div>
+    {% else %}
+      {% for team in teams %}
+        {% set member_uids = [] %}
+        {% for m in team.members %}{% set _ = member_uids.append(m.student_user_id) %}{% endfor %}
+        <div class="card mb-3">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+              <div>
+                <h5 class="mb-1">{{ team.name }}</h5>
+                {% if team.description %}
+                  <p class="text-muted small mb-1">{{ team.description }}</p>
+                {% endif %}
+                <div class="d-flex flex-wrap gap-1 mt-1">
+                  {% for m in team.members %}
+                    <span class="badge bg-light text-dark border">
+                      {{ m.student_name }}
+                    </span>
+                  {% else %}
+                    <span class="text-muted small">No members yet.</span>
+                  {% endfor %}
+                </div>
+              </div>
+              <div>
+                <button class="btn btn-sm btn-outline-secondary" type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#editTeam{{ team.id }}">
+                  <i class="bi bi-pencil"></i> Edit
+                </button>
+                <form method="post"
+                      action="{{ url_for('cleaning.delete_team', team_id=team.id) }}"
+                      class="d-inline"
+                      onsubmit="return confirm('Delete team {{ team.name }}?');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">
+                    <i class="bi bi-trash"></i>
+                  </button>
+                </form>
+              </div>
+            </div>
+
+            <div class="collapse mt-3" id="editTeam{{ team.id }}">
+              <form method="post"
+                    action="{{ url_for('cleaning.edit_team', team_id=team.id) }}"
+                    class="bg-light p-3 rounded border">
+                <div class="row g-2">
+                  <div class="col-md-5">
+                    <label class="form-label small">Name</label>
+                    <input class="form-control form-control-sm" name="name"
+                           value="{{ team.name }}" required>
+                  </div>
+                  <div class="col-md-7">
+                    <label class="form-label small">Description</label>
+                    <input class="form-control form-control-sm" name="description"
+                           value="{{ team.description or '' }}">
+                  </div>
+                </div>
+                <div class="mt-3">
+                  <label class="form-label small">Members</label>
+                  <div class="row g-2 student-picker">
+                    {% for u in students %}
+                      <div class="col-md-4 col-sm-6">
+                        <label class="member-pill">
+                          <input type="checkbox" name="student_ids" value="{{ u.id }}"
+                                 {% if u.id in member_uids %}checked{% endif %}>
+                          <span>{{ u.name }}{% if u.student_id %} ({{ u.student_id }}){% endif %}</span>
+                        </label>
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+                <button class="btn btn-primary btn-sm mt-3" type="submit">
+                  <i class="bi bi-check-lg"></i> Save team
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+
+</div>
+{% endblock %}

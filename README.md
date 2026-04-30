@@ -1,8 +1,9 @@
 # International Lounge
 
 A web app to centralize daily-life systems for international students.
-**Version 2** adds **Announcements** and **Requests to the International
-Department** on top of the V1 substitute-food management module.
+**Version 3** adds a **Borrowing system** for shared physical items and
+**Cleaning Teams + Sessions** with subtask checklists, on top of the
+V2 announcements/requests modules and the V1 substitute-food module.
 
 ---
 
@@ -13,17 +14,58 @@ rotations, borrowed equipment, announcements) that today are tracked in
 spreadsheets and group chats. The International Lounge gradually replaces
 those spreadsheets with a single, role-based dashboard.
 
-## Version 2 scope
+## Version 3 scope
 
 Implemented modules:
 - **Substitute food management** (V1, unchanged).
-- **Announcements** — staff post; students see what's published and
-  matches their audience; optional emoji reactions.
-- **Requests to International Department** — students submit support
-  tickets; staff filter, respond, and update status.
+- **Announcements** (V2, unchanged).
+- **Requests to International Department** (V2, unchanged).
+- **Borrowing system** (V3) — staff curate a catalog of borrowable
+  items with stock counts; students request items with a return-by
+  date; staff approve/reject and mark returned. Stock invariant
+  `0 ≤ available ≤ total` enforced server-side.
+- **Cleaning teams & sessions** (V3) — staff create teams of students,
+  schedule cleaning sessions per team with a checklist of subtasks;
+  team members tick their subtasks (with optional notes), staff
+  verify each one or mark it missed; sessions auto-complete when all
+  subtasks are verified.
 
-Borrowing, Common Group Chat, and Cleaning Sessions remain "Coming soon"
-placeholders in the sidebar.
+Common Group Chat remains a "Coming soon" placeholder in the sidebar.
+
+### V3 module: Borrowing
+
+- **Catalog management** at `/borrowing/` (staff): add, edit, activate
+  /deactivate items with name, category, description, total quantity.
+  *Available* is derived from outstanding approved requests, never
+  edited by hand — an item's *available* equals *total* minus the
+  number currently borrowed.
+- **Student request flow** — students see only active items with
+  `available > 0`, submit a quantity and an optional return-by date.
+- **Staff queue** — pending requests go to a triage list. Staff
+  *approve* (decrements `available`), *reject* (no stock change), or
+  mark *returned* (restores `available`) with optional staff notes.
+- **History snapshot** — each request stores `student_name`,
+  `item_name`, and `handled_by_name` snapshots so renames or deletes
+  don't rewrite the borrowing history.
+
+### V3 module: Cleaning teams & sessions
+
+- **Teams** — staff create named cleaning teams at `/cleaning/` and
+  pick member students from a checkbox picker. Membership is updated
+  by hash-set diff so duplicate adds and removes are O(1) per student.
+- **Sessions** — staff schedule a session for a team with a date,
+  optional start/end time, location, and a newline-separated list of
+  subtasks. Each subtask becomes a row in `cleaning_tasks`.
+- **Subtask checklist** —
+  - Status flow: `assigned` → `marked_done` (by team member, optional
+    note) → `verified_done` (by staff). Staff may also `marked_missed`
+    a task that wasn't completed.
+  - When **every** subtask in a session is verified, the session
+    auto-completes (`status = completed`).
+  - Cancelled sessions are visually muted and ignore further actions.
+- **Snapshots** — `student_name`, `team_name`, and `handled_by_name`
+  are stored on the row so deleting a student or renaming a team does
+  not rewrite cleaning history.
 
 ### V2 module: Announcements
 
@@ -57,8 +99,8 @@ placeholders in the sidebar.
   straight to the staff triage list.
 
 > Requests vs. Borrowing — these are different: *Requests* are free-form
-> support tickets to the International Department. *Borrowing* (still
-> coming soon) will manage physical items checked out from the lounge.
+> support tickets to the International Department. *Borrowing* (V3)
+> manages physical items checked out from the lounge.
 
 ## Version 1 scope (still active)
 
@@ -119,11 +161,7 @@ The **substitute food management module** is unchanged from V1.
   forms.
 
 ### Planned future features (placeholders shown in the sidebar)
-- Borrowing system
-- Requests to International Department
-- Announcements
 - Common Group Chat
-- Cleaning Sessions
 
 ## User roles
 
@@ -194,10 +232,9 @@ The **substitute food management module** is unchanged from V1.
   title) is called **Homepage** for both staff and students — the route
   paths (`/admin/` and `/student/`) are unchanged so internal references
   still work.
-- **Future modules.** Borrowing, Requests to International Department,
-  Announcements, Common Group Chat, and Cleaning Sessions remain in
-  the sidebar as **Coming soon** placeholders only — none of them are
-  implemented in V1.
+- **Future modules.** Of the original "Coming soon" set, only
+  Common Group Chat remains a placeholder — Announcements, Requests,
+  Borrowing, and Cleaning are now implemented.
 
 ## Demo accounts (seeded automatically)
 
@@ -250,6 +287,10 @@ python app.py
 ├── requests_bp.py          # V2: Requests blueprint (named "requests";
 │                           #   file is *_bp.py to avoid shadowing the
 │                           #   `requests` PyPI library)
+├── borrowing.py            # V3: Borrowing blueprint (item catalog,
+│                           #   request approve/reject/return)
+├── cleaning.py             # V3: Cleaning blueprint (teams, sessions,
+│                           #   subtask checklist + verification)
 ├── seed.py                 # Demo data seeder
 ├── instance/
 │   └── app.db              # SQLite database (created at runtime)
@@ -277,11 +318,17 @@ python app.py
 │   │   ├── staff_list.html
 │   │   ├── student_list.html
 │   │   └── form.html
-│   └── requests/            # V2
-│       ├── student_list.html
-│       ├── student_new.html
-│       ├── admin_list.html
-│       └── detail.html
+│   ├── requests/            # V2
+│   │   ├── student_list.html
+│   │   ├── student_new.html
+│   │   ├── admin_list.html
+│   │   └── detail.html
+│   ├── borrowing/           # V3
+│   │   ├── student.html
+│   │   └── admin.html
+│   └── cleaning/            # V3
+│       ├── student.html
+│       └── admin.html
 ├── docs/
 │   └── project-spec.md
 └── README.md
@@ -371,3 +418,34 @@ You can also log any student in by their student ID — e.g.
    by status, category, student, or text. Open a request → write a
    response, change the status, or delete it. The student sees the
    response and updated status on their own detail page.
+
+### V3 testing flows
+
+9. **Borrowing (staff)** — sign in as admin, open *Borrowing*. Click
+   *Add item*, enter a name, category, total quantity, and a note —
+   save. Active items appear in the catalog with `available / total`.
+   Edit any item to change the total or deactivate it. Pending
+   requests show in the *Requests* queue with **Approve** / **Reject**
+   buttons; approved requests show **Mark returned**.
+
+10. **Borrowing (student)** — sign in as `student1`. The page lists
+    only items with `available > 0`. Submit a request with quantity
+    and an optional return-by date. The request shows under *My
+    requests* with status **Pending**. Once a staffer approves, the
+    badge flips to **Approved**; once they mark it returned, to
+    **Returned**.
+
+11. **Cleaning (staff)** — sign in as admin, open *Cleaning*. Create
+    a *Team* (name + member checkboxes). Then create a *Session* for
+    that team with a date, optional time/location, and a newline-
+    separated list of subtasks. Each line becomes a checklist row.
+    Use **Verify** on each subtask as students complete them — when
+    all are verified the session badge flips to **Completed**
+    automatically. Use **Mark missed** to record an undone task.
+    *Cancel session* mutes the card visually.
+
+12. **Cleaning (student)** — sign in as `student1`. The page shows
+    only sessions for teams the student belongs to. Each subtask is
+    a checkbox-style row with **Mark done** (and an optional note).
+    Verified rows turn green; missed rows turn red. Students who are
+    not on any team see an empty-state message.

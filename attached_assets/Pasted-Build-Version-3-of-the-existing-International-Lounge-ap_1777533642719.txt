@@ -1,0 +1,493 @@
+Build Version 3 of the existing International Lounge app.
+
+Important:
+- Do NOT rebuild the app from scratch.
+- Modify the existing code only.
+- Preserve the current UI style, spacing, colors, sidebar, layout, and role system.
+- Keep all Version 1 and Version 2 features working.
+- Keep the app runnable.
+- Add only the Version 3 features below.
+- Do not implement full common group chat yet.
+
+Current app context:
+International Lounge is a Flask + SQLite web app for international students.
+Existing features include:
+- login by email or student ID
+- roles: admin, manager, student
+- settings/profile and phone privacy
+- substitute food management
+- warehouse/locker inventory
+- shareable food log
+- inventory history
+- announcements
+- requests to international department
+
+Version 3 goal:
+Add:
+1. Borrowing system
+2. Cleaning teams and cleaning sessions
+3. Small announcement reaction polish only if safe
+
+==================================================
+FEATURE 1: BORROWING SYSTEM
+==================================================
+
+Purpose:
+Allow students to request shared physical items such as umbrellas, chargers, adapters, calculators, cleaning tools, board games, or sports equipment.
+
+This is separate from Requests to International Department.
+Requests = asking for help/service.
+Borrowing = requesting a physical shared item with quantity tracking.
+
+Roles:
+Admin:
+- create/edit/delete borrowable items
+- set total and available quantity
+- approve/reject borrow requests
+- mark items as returned
+- view all borrowing history
+
+Manager:
+- same operational borrowing permissions as admin
+- create/edit/delete borrowable items
+- approve/reject borrow requests
+- mark returned
+- view all borrowing history
+
+Student:
+- view available borrowable items
+- submit borrow request
+- choose quantity
+- choose borrow_until_date
+- view own borrowing requests/history
+- cannot approve/reject requests
+- cannot edit item inventory
+
+Borrowable item fields:
+- id
+- name
+- category
+- description
+- total_quantity
+- available_quantity
+- is_active
+- created_at
+- updated_at
+
+Borrow request fields:
+- id
+- item_id
+- item_name
+- student_user_id
+- student_name
+- quantity
+- borrow_until_date
+- status
+- requested_at
+- approved_at
+- rejected_at
+- returned_at
+- handled_by_user_id
+- handled_by_name
+- staff_note
+
+Status values:
+- pending
+- approved
+- rejected
+- returned
+
+Rules:
+- Student request form should NOT ask for a reason.
+- Student request form should ask for borrow_until_date.
+- borrow_until_date is required.
+- borrow_until_date cannot be in the past.
+- When student submits request, status = pending.
+- Submitting request does NOT decrease available_quantity.
+- When admin/manager approves, available_quantity decreases.
+- Admin/manager cannot approve if available_quantity is insufficient.
+- When admin/manager marks returned, available_quantity increases.
+- available_quantity must never exceed total_quantity.
+- available_quantity must never go below 0.
+- Students can only view their own borrow requests.
+- Admin/manager can view all requests.
+- Admin/manager can add staff_note when rejecting or managing a request.
+
+Pages/routes:
+1. Student Borrowing page
+   - list active borrowable items
+   - show available / total quantity
+   - request borrow button/form
+   - request quantity
+   - borrow_until_date
+   - list my borrow requests
+   - status badges
+   - newest first
+
+2. Admin/Manager Borrowing Management page
+   - manage borrowable items
+   - add/edit/delete items
+   - set total/available quantity
+   - list all borrow requests
+   - filter by status
+   - approve/reject pending requests
+   - mark approved requests as returned
+   - status badges
+   - newest first
+
+Sidebar:
+- Replace Borrowing Coming Soon placeholder with real Borrowing link.
+- Students see “Borrowing”.
+- Admin/manager see “Borrowing” or “Manage Borrowing”.
+
+==================================================
+FEATURE 2: CLEANING TEAMS AND CLEANING SESSIONS
+==================================================
+
+Purpose:
+Make cleaning duties easier to organize and follow.
+
+Cleaning should be team-based, not only individual assignment-based.
+
+Concept:
+Admin/manager creates cleaning teams.
+Each team contains selected students.
+Admin/manager creates a cleaning session and assigns one team to it.
+Each session has subtasks such as:
+- Vacuuming
+- Cleaning tables
+- Taking out trash
+- Organizing food locker
+
+Team members can mark subtasks as done.
+Admin/manager verifies the subtasks.
+The session becomes completed only when all subtasks are verified_done.
+
+Roles:
+Admin:
+- create/edit/delete cleaning teams
+- add/remove students from teams
+- create/edit/delete/cancel cleaning sessions
+- assign a team to a cleaning session
+- add/edit/delete subtasks
+- verify marked-done subtasks
+- mark tasks missed
+- view all sessions and teams
+
+Manager:
+- same operational cleaning permissions as admin
+- create/edit/delete cleaning teams
+- manage team members
+- create/edit/delete/cancel sessions
+- verify marked-done subtasks
+- mark tasks missed
+
+Student:
+- view cleaning sessions assigned to their team
+- view subtasks
+- mark subtasks as done
+- add optional student note when marking done
+- cannot verify their own completion
+- cannot edit teams or sessions
+
+CleaningTeam fields:
+- id
+- name
+- description
+- created_by_user_id
+- created_at
+- updated_at
+
+CleaningTeamMember fields:
+- id
+- team_id
+- student_user_id
+- student_name
+- added_at
+
+CleaningSession fields:
+- id
+- title
+- description
+- location
+- team_id
+- team_name
+- scheduled_date
+- start_time
+- end_time
+- status
+- created_by_user_id
+- created_at
+- updated_at
+
+CleaningTask fields:
+- id
+- session_id
+- task_name
+- status
+- student_note
+- marked_done_by_user_id
+- marked_done_by_name
+- marked_done_at
+- verified_by_user_id
+- verified_by_name
+- verified_at
+- admin_note
+
+Cleaning session status values:
+- scheduled
+- completed
+- cancelled
+
+Cleaning task status values:
+- assigned
+- marked_done
+- verified_done
+- missed
+
+Rules:
+- Admin/manager can create a cleaning team with selected students.
+- Admin/manager can edit team members later.
+- A student can belong to multiple teams if needed.
+- Admin/manager can create a cleaning session assigned to one team.
+- A session must have at least one cleaning task/subtask.
+- A cleaning task starts as assigned.
+- Only students in the assigned team can mark that session’s subtasks as done.
+- Any team member can mark any subtask for their team as done.
+- When a student marks a task done:
+  - task status becomes marked_done
+  - marked_done_by_user_id/name/time are saved
+  - optional student_note is saved
+- Admin/manager can verify marked_done tasks:
+  - task status becomes verified_done
+  - verified_by_user_id/name/time are saved
+- Admin/manager can mark a task missed.
+- Students cannot verify tasks.
+- Students cannot mark tasks for teams they are not in.
+- Cancelled sessions should not allow students to mark tasks done.
+- If all subtasks in a session are verified_done, automatically set session status to completed.
+- If any subtask is not verified_done, session remains scheduled unless cancelled.
+- Use clear status badges.
+
+Pages/routes:
+1. Admin/Manager Cleaning page
+   Sections:
+   - Cleaning Teams
+     - create team
+     - edit team
+     - add/remove students
+     - show team members
+   - Cleaning Sessions
+     - create session
+     - assign team
+     - add subtasks
+     - edit/cancel/delete session
+     - view session subtasks
+     - verify marked_done tasks
+     - mark tasks missed
+     - filter by date/status if easy
+
+2. Student Cleaning page
+   - show sessions assigned to teams the student belongs to
+   - show session title, date/time, location, team name, status
+   - show subtasks
+   - allow mark subtask as done
+   - optional student note when marking done
+   - show which tasks are verified_done
+   - show which tasks are still waiting for verification
+   - students only see their own team sessions
+
+Sidebar:
+- Replace Cleaning Sessions Coming Soon placeholder with real Cleaning link.
+- Students see “Cleaning”.
+- Admin/manager see “Cleaning” or “Manage Cleaning”.
+
+==================================================
+FEATURE 3: ANNOUNCEMENT REACTION POLISH
+==================================================
+
+If announcement reactions already exist:
+- Improve them so clicking a reaction updates counts without a full page refresh.
+- Use fetch/AJAX and return JSON.
+- Preserve current UI style.
+- Keep server-side permission/security checks.
+- If this is risky or time-consuming, skip it and keep current refresh behavior.
+
+If announcement reactions do not exist:
+- Do not implement them now unless very easy.
+
+==================================================
+UI REQUIREMENTS
+==================================================
+
+Use the existing International Lounge style.
+
+General:
+- clean cards/tables/forms
+- consistent buttons
+- consistent badges
+- no crowded action buttons
+- newest first ordering
+- date/time displayed near headers, not inside text body
+- responsive layout
+- preserve sidebar design and bottom user chip behavior
+
+Borrowing UI:
+- student item cards/table should clearly show available / total quantity
+- borrow request form should ask quantity and borrow_until_date
+- no reason field
+- admin/manager request table should show borrow_until_date clearly
+
+Cleaning UI:
+- teams should be easy to understand
+- session should clearly show assigned team
+- subtasks should look like a checklist
+- student can mark tasks done
+- admin/manager can verify tasks
+- show progress like “2/4 tasks verified” if easy
+- status badges should be clear
+
+Status badges:
+Borrowing:
+- pending
+- approved
+- rejected
+- returned
+
+Cleaning session:
+- scheduled
+- completed
+- cancelled
+
+Cleaning task:
+- assigned
+- marked_done
+- verified_done
+- missed
+
+==================================================
+DATA STRUCTURES / PERFORMANCE
+==================================================
+
+Because this is a data structures class project, add short comments where useful.
+
+Use appropriate structures:
+- database filtering instead of loading all rows and filtering manually
+- dictionaries/hash maps for O(1) lookup where useful
+- pagination for long borrowing/cleaning history if easy
+- newest-first ordering using database query
+
+For borrowing:
+- ensure quantity updates are safe and consistent
+- prevent negative quantities
+- prevent approving more than available
+- query only the current user’s borrow requests for student view
+
+For cleaning:
+- efficient team membership lookup
+- students should query only sessions for teams they belong to
+- staff should query all sessions with filters
+- use dictionaries/hash maps where useful for grouping sessions/tasks/team members
+
+==================================================
+DOCUMENTATION
+==================================================
+
+Update README.md and docs/project-spec.md.
+
+Add:
+- Version 3 scope
+- Borrowing module
+- Cleaning Teams module
+- Cleaning Sessions module
+- difference between Requests and Borrowing
+- role permissions
+- new database models/tables
+- new routes/pages
+- testing instructions
+
+Future features still planned but not implemented:
+- Common Group Chat
+
+==================================================
+TESTING REQUIREMENTS
+==================================================
+
+After implementation, provide clear testing steps.
+
+Admin flow:
+1. Login as admin
+2. Create borrowable item
+3. Login as student and submit borrow request with borrow_until_date
+4. Login as admin and approve/reject borrow request
+5. Mark borrowed item returned
+6. Create cleaning team with selected students
+7. Create cleaning session assigned to that team
+8. Add subtasks such as Vacuuming and Cleaning tables
+9. Login as team student and mark subtasks done
+10. Login as admin and verify subtasks
+11. Confirm session becomes completed only after all subtasks are verified
+
+Manager flow:
+1. Login as manager
+2. Manage borrowing items and requests
+3. Manage cleaning teams and sessions
+4. Verify cleaning tasks
+5. Confirm manager still cannot access restricted admin-only user controls
+
+Student flow:
+1. Login as standard student
+2. View Borrowing page
+3. Submit borrow request with borrow_until_date
+4. View own borrow request status
+5. View Cleaning page
+6. Confirm student only sees sessions for teams they belong to
+7. Mark a subtask done
+8. Confirm student cannot verify tasks
+9. Confirm student cannot access admin/manager pages
+
+Sub-food student flow:
+1. Confirm Lounge Locker still works
+2. Confirm Announcements still work
+3. Confirm Requests still work
+4. Confirm Borrowing and Cleaning work
+
+Regression tests:
+- Login by email still works
+- Login by student ID still works
+- Settings page still works
+- Phone privacy still works
+- V1 food inventory pages still work
+- V2 announcements still work
+- V2 requests still work
+- Standard students still do not see food pages
+- Sub-food students still see Lounge Locker
+
+==================================================
+IMPORTANT SAFETY RULES
+==================================================
+
+Do not break:
+- login by email or student ID
+- settings/profile page
+- phone number formatting/privacy
+- admin/manager/student permissions
+- standard student hiding food pages
+- sub-food student locker page
+- substitute food inventory logic
+- inventory logs/history
+- shareable food log
+- announcements
+- requests
+- current sidebar footer/user chip behavior
+
+After finishing, summarize:
+1. files changed
+2. database/schema changes
+3. new routes/pages
+4. new sidebar items
+5. how to test borrowing
+6. how to test cleaning teams
+7. how to test cleaning sessions/tasks
+8. whether announcement reaction AJAX was implemented or skipped
+9. any limitations or things left for Version 4
